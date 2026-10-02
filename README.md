@@ -23,6 +23,19 @@ cargo run --release --features scan --bin clevershim-scan -- --out catalog/packa
 
 `catalog/packages.yaml` is compiled into the manager with `include_str!`. `catalog/collisions.yaml` lists commands that more than one package provides. `catalog/overrides.yaml` sets shim-target priority and force-includes `Gyan.FFmpeg`.
 
+## Git commit email guard
+
+Enable the versioned hook in each clone:
+
+```bash
+git config --local core.hooksPath .githooks
+git config --local user.email "8874908+kcrkor@users.noreply.github.com"
+```
+
+Other contributors should use their own GitHub noreply address. The `pre-commit` hook checks the effective author and committer emails, including environment and `--author` overrides, and rejects addresses outside `@users.noreply.github.com`. Both `username@users.noreply.github.com` and `ID+username@users.noreply.github.com` are accepted.
+
+Hook activation is local configuration and does not propagate when pushed or cloned. This guard runs for `git commit`; it is bypassable with `--no-verify` and is not server-side enforcement.
+
 ## Install and commands
 
 `clevershim.exe` is both the CLI and the installer.

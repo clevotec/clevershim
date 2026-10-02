@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+require_noreply_email() {
+    role=$1
+    identity=$2
+    email=${identity#*<}
+    email=${email%%>*}
+
+    case "$email" in
+        *@users.noreply.github.com)
+            local_part=${email%@users.noreply.github.com}
+            case "$local_part" in
+                ''|*@*|*[[:space:]]*) ;;
+                *) return 0 ;;
+            esac
+            ;;
+    esac
+
+    printf 'Commit rejected: %s email "%s" must be a GitHub @users.noreply.github.com address.\n' "$role" "$email" >&2
+    printf 'Set user.email to your GitHub noreply address and remove any non-noreply identity overrides.\n' >&2
+    return 1
+}
+
+require_noreply_email author "$(git var GIT_AUTHOR_IDENT)"
+require_noreply_email committer "$(git var GIT_COMMITTER_IDENT)"
