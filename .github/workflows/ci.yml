@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  catalog-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Scan the public WinGet source index
+        run: cargo run --release --features scan --bin clevershim-scan -- --out catalog/packages.yaml --overrides catalog/overrides.yaml
+      - name: Test catalog, path matching, and sidecar logic
+        run: cargo test --workspace
+      - name: Upload the exposed-package list
+        uses: actions/upload-artifact@v4
+        with:
+          name: winget-catalog
+          path: |
+            catalog/packages.yaml
+            catalog/collisions.yaml
+
+  windows:
+    needs: catalog-and-test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Download the scanned catalog
+        uses: actions/download-artifact@v4
+        with:
+          name: winget-catalog
+          path: catalog
+      - name: Build the shim stub
+        run: cargo build --release --bin clevershim-shim
+      - name: Embed the stub and build the manager
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path assets | Out-Null
+          Copy-Item target\release\clevershim-shim.exe assets\clevershim-shim.exe
+          cargo build --release --bin clevershim
+      - name: Build a shim and run the repair test
+        run: cargo test --release --test shim_launch --test windows_shim -- --test-threads=1

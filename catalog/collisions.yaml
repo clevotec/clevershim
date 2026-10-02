@@ -1,0 +1,453 @@
+# Commands provided by more than one package.
+AudioSwitcher:
+- Esquillax.AudioSwitcher
+- FortyOneLtd.AudioSwitcher
+ImageDiags:
+- HP.HPImageDiags.4
+- HP.HPImageDiags.5
+ag:
+- HUSTOpenAtomClub.AtomGitCLI
+- hust-open-atom-club.atomgit-cli
+aspire:
+- Microsoft.Aspire
+- Microsoft.Aspire.Prerelease
+aws-vault:
+- 99designs.aws-vault
+- ByteNess.AWSVault
+bun:
+- Oven-sh.Bun
+- Oven-sh.Bun.BaselineProfile
+- Oven-sh.Bun.Profile
+bunx:
+- Oven-sh.Bun
+- Oven-sh.Bun.BaselineProfile
+- Oven-sh.Bun.Profile
+c++:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+changerig:
+- RigSmith.ChangeRig
+- RigSmith.Rigsmith
+clang:
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+clang-format:
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+clang-tidy:
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+clangd:
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+claude-code-usage-monitor:
+- hadufer.ClaudeCodeUsageMonitor
+- macekkrystof.ClaudeCodeUsageMonitor
+clauderig:
+- RigSmith.ClaudeRig
+- RigSmith.Rigsmith
+cmake:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+copilot:
+- Amazon.CopilotCLI
+- GitHub.Copilot
+corepack:
+- OpenJS.NodeJS.10
+- OpenJS.NodeJS.17
+- OpenJS.NodeJS.19
+- OpenJS.NodeJS.22
+- OpenJS.NodeJS.6
+- OpenJS.NodeJS.8
+- OpenJS.NodeJS.LTS
+ctags:
+- UniversalCtags.Ctags
+- UniversalCtags.Ctags.Nightly
+dbt:
+- dbtLabs.dbt
+- dbtLabs.dbtFusion
+ffmpeg:
+- BtbN.FFmpeg.GPL
+- BtbN.FFmpeg.GPL.5.1
+- BtbN.FFmpeg.GPL.6.1
+- BtbN.FFmpeg.GPL.7.1
+- BtbN.FFmpeg.GPL.8.0
+- BtbN.FFmpeg.GPL.8.1
+- BtbN.FFmpeg.GPL.9.0
+- BtbN.FFmpeg.GPL.Shared
+- BtbN.FFmpeg.GPL.Shared.5.1
+- BtbN.FFmpeg.GPL.Shared.6.1
+- BtbN.FFmpeg.GPL.Shared.7.1
+- BtbN.FFmpeg.GPL.Shared.8.0
+- BtbN.FFmpeg.GPL.Shared.8.1
+- BtbN.FFmpeg.GPL.Shared.9.0
+- BtbN.FFmpeg.LGPL
+- BtbN.FFmpeg.LGPL.5.1
+- BtbN.FFmpeg.LGPL.6.1
+- BtbN.FFmpeg.LGPL.7.1
+- BtbN.FFmpeg.LGPL.8.0
+- BtbN.FFmpeg.LGPL.8.1
+- BtbN.FFmpeg.LGPL.Shared
+- BtbN.FFmpeg.LGPL.Shared.5.1
+- BtbN.FFmpeg.LGPL.Shared.6.1
+- BtbN.FFmpeg.LGPL.Shared.7.1
+- BtbN.FFmpeg.LGPL.Shared.8.0
+- BtbN.FFmpeg.LGPL.Shared.8.1
+- BtbN.FFmpeg.LGPL.Shared.9.0
+- Defisym.FFmpeg.GPL
+- Defisym.FFmpeg.GPL.7.1
+- Defisym.FFmpeg.GPL.8.1
+- Defisym.FFmpeg.GPL.Shared
+- Defisym.FFmpeg.GPL.Shared.7.1
+- Defisym.FFmpeg.GPL.Shared.8.1
+- Defisym.FFmpeg.LGPL
+- Defisym.FFmpeg.LGPL.7.1
+- Defisym.FFmpeg.LGPL.8.1
+- Defisym.FFmpeg.LGPL.Shared
+- Defisym.FFmpeg.LGPL.Shared.7.1
+- Defisym.FFmpeg.LGPL.Shared.8.1
+- Gyan.FFmpeg
+- yt-dlp.FFmpeg
+- yt-dlp.FFmpeg.Shared
+ffplay:
+- BtbN.FFmpeg.GPL
+- BtbN.FFmpeg.GPL.5.1
+- BtbN.FFmpeg.GPL.6.1
+- BtbN.FFmpeg.GPL.7.1
+- BtbN.FFmpeg.GPL.8.0
+- BtbN.FFmpeg.GPL.8.1
+- BtbN.FFmpeg.GPL.9.0
+- BtbN.FFmpeg.GPL.Shared
+- BtbN.FFmpeg.GPL.Shared.5.1
+- BtbN.FFmpeg.GPL.Shared.6.1
+- BtbN.FFmpeg.GPL.Shared.7.1
+- BtbN.FFmpeg.GPL.Shared.8.0
+- BtbN.FFmpeg.GPL.Shared.8.1
+- BtbN.FFmpeg.GPL.Shared.9.0
+- BtbN.FFmpeg.LGPL
+- BtbN.FFmpeg.LGPL.5.1
+- BtbN.FFmpeg.LGPL.6.1
+- BtbN.FFmpeg.LGPL.7.1
+- BtbN.FFmpeg.LGPL.8.0
+- BtbN.FFmpeg.LGPL.8.1
+- BtbN.FFmpeg.LGPL.Shared
+- BtbN.FFmpeg.LGPL.Shared.5.1
+- BtbN.FFmpeg.LGPL.Shared.6.1
+- BtbN.FFmpeg.LGPL.Shared.7.1
+- BtbN.FFmpeg.LGPL.Shared.8.0
+- BtbN.FFmpeg.LGPL.Shared.8.1
+- BtbN.FFmpeg.LGPL.Shared.9.0
+- Defisym.FFmpeg.GPL
+- Defisym.FFmpeg.GPL.7.1
+- Defisym.FFmpeg.GPL.8.1
+- Defisym.FFmpeg.GPL.Shared
+- Defisym.FFmpeg.GPL.Shared.7.1
+- Defisym.FFmpeg.GPL.Shared.8.1
+- Defisym.FFmpeg.LGPL
+- Defisym.FFmpeg.LGPL.7.1
+- Defisym.FFmpeg.LGPL.8.1
+- Defisym.FFmpeg.LGPL.Shared
+- Defisym.FFmpeg.LGPL.Shared.7.1
+- Defisym.FFmpeg.LGPL.Shared.8.1
+- Gyan.FFmpeg
+- yt-dlp.FFmpeg
+- yt-dlp.FFmpeg.Shared
+ffprobe:
+- BtbN.FFmpeg.GPL
+- BtbN.FFmpeg.GPL.5.1
+- BtbN.FFmpeg.GPL.6.1
+- BtbN.FFmpeg.GPL.7.1
+- BtbN.FFmpeg.GPL.8.0
+- BtbN.FFmpeg.GPL.8.1
+- BtbN.FFmpeg.GPL.9.0
+- BtbN.FFmpeg.GPL.Shared
+- BtbN.FFmpeg.GPL.Shared.5.1
+- BtbN.FFmpeg.GPL.Shared.6.1
+- BtbN.FFmpeg.GPL.Shared.7.1
+- BtbN.FFmpeg.GPL.Shared.8.0
+- BtbN.FFmpeg.GPL.Shared.8.1
+- BtbN.FFmpeg.GPL.Shared.9.0
+- BtbN.FFmpeg.LGPL
+- BtbN.FFmpeg.LGPL.5.1
+- BtbN.FFmpeg.LGPL.6.1
+- BtbN.FFmpeg.LGPL.7.1
+- BtbN.FFmpeg.LGPL.8.0
+- BtbN.FFmpeg.LGPL.8.1
+- BtbN.FFmpeg.LGPL.Shared
+- BtbN.FFmpeg.LGPL.Shared.5.1
+- BtbN.FFmpeg.LGPL.Shared.6.1
+- BtbN.FFmpeg.LGPL.Shared.7.1
+- BtbN.FFmpeg.LGPL.Shared.8.0
+- BtbN.FFmpeg.LGPL.Shared.8.1
+- BtbN.FFmpeg.LGPL.Shared.9.0
+- Defisym.FFmpeg.GPL
+- Defisym.FFmpeg.GPL.7.1
+- Defisym.FFmpeg.GPL.8.1
+- Defisym.FFmpeg.GPL.Shared
+- Defisym.FFmpeg.GPL.Shared.7.1
+- Defisym.FFmpeg.GPL.Shared.8.1
+- Defisym.FFmpeg.LGPL
+- Defisym.FFmpeg.LGPL.7.1
+- Defisym.FFmpeg.LGPL.8.1
+- Defisym.FFmpeg.LGPL.Shared
+- Defisym.FFmpeg.LGPL.Shared.7.1
+- Defisym.FFmpeg.LGPL.Shared.8.1
+- Gyan.FFmpeg
+- yt-dlp.FFmpeg
+- yt-dlp.FFmpeg.Shared
+fleet:
+- Cenvero.Fleet
+- JetBrains.FleetLauncher.EAP
+g++:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+gcc:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+gdb:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+gfortran:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+ghv:
+- DuckStudio.GitHubView
+- DuckStudio.GitHubView.Nightly
+git-crypt:
+- AGWA.git-crypt
+- ja-ortiz-uniandes.git-crypt-unofficial
+gitversion:
+- GitTools.GitVersion
+- GitTower.GitFlowNext
+gsudo:
+- gerardog.gsudo
+- nicerloop.ivanti-gsudo
+guiscrcpy:
+- srevinsaju.guiscrcpy.PyQt5
+- srevinsaju.guiscrcpy.PySide2
+herdr:
+- Herdr.Herdr.Preview
+- khanhtd36.herdr-khanhtd36
+hmcl-dev:
+- HMCL.HMCL.Dev
+- HMCL.HMCL.Dev.CNB
+- HMCL.HMCL.Dev.Maven
+- HMCL.HMCL.Dev.Maven.TencentCloudMirror
+hmcl-stable:
+- HMCL.HMCL.Stable
+- HMCL.HMCL.Stable.CNB
+- HMCL.HMCL.Stable.Maven
+- HMCL.HMCL.Stable.Maven.TencentCloudMirror
+jpcontroller:
+- ej-technologies.JProfiler.13.Agent
+- ej-technologies.JProfiler.14.Agent
+- ej-technologies.JProfiler.15.Agent
+- ej-technologies.JProfiler.16.Agent
+jpdump:
+- ej-technologies.JProfiler.13.Agent
+- ej-technologies.JProfiler.14.Agent
+- ej-technologies.JProfiler.15.Agent
+- ej-technologies.JProfiler.16.Agent
+jpenable:
+- ej-technologies.JProfiler.13.Agent
+- ej-technologies.JProfiler.14.Agent
+- ej-technologies.JProfiler.15.Agent
+- ej-technologies.JProfiler.16.Agent
+jwasm:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+kache:
+- kunobi-ninja.kache
+- kunobi-ninja.kache.Unstable
+kimi:
+- MoonshotAI.KimiCLI
+- MoonshotAI.KimiCodeCLI
+krokiet:
+- qarmin.krokiet
+- qarmin.krokiet.vulkan
+ld:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+lean:
+- Lean.Elan
+- Lean.Lean
+leanc:
+- Lean.Elan
+- Lean.Lean
+lld:
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+lldb:
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+- MartinStorsjo.LLVM-MinGW.MSVCRT
+- MartinStorsjo.LLVM-MinGW.UCRT
+mihomo:
+- MetaCubeX.Mihomo
+- MetaCubeX.Mihomo.GOAMD64v1
+- MetaCubeX.Mihomo.GOAMD64v2
+mimo:
+- Xiaomi.MiMoCode
+- Xiaomi.MiMoCode.Baseline
+nasm:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+node:
+- OpenJS.NodeJS.10
+- OpenJS.NodeJS.17
+- OpenJS.NodeJS.19
+- OpenJS.NodeJS.22
+- OpenJS.NodeJS.4
+- OpenJS.NodeJS.6
+- OpenJS.NodeJS.7
+- OpenJS.NodeJS.8
+- OpenJS.NodeJS.LTS
+npm:
+- OpenJS.NodeJS.10
+- OpenJS.NodeJS.17
+- OpenJS.NodeJS.19
+- OpenJS.NodeJS.22
+- OpenJS.NodeJS.4
+- OpenJS.NodeJS.6
+- OpenJS.NodeJS.7
+- OpenJS.NodeJS.8
+- OpenJS.NodeJS.LTS
+npx:
+- OpenJS.NodeJS.10
+- OpenJS.NodeJS.17
+- OpenJS.NodeJS.19
+- OpenJS.NodeJS.22
+- OpenJS.NodeJS.6
+- OpenJS.NodeJS.7
+- OpenJS.NodeJS.8
+- OpenJS.NodeJS.LTS
+odin:
+- AsimAftab.Odin
+- odin-lang.Odin
+one-api:
+- JustSong.OneAPI
+- MartialBE.OneHub
+php:
+- PHP.PHP.8.1
+- PHP.PHP.8.2
+- PHP.PHP.8.3
+- PHP.PHP.8.4
+- PHP.PHP.8.5
+- PHP.PHP.NTS.8.1
+- PHP.PHP.NTS.8.2
+- PHP.PHP.NTS.8.3
+- PHP.PHP.NTS.8.4
+- PHP.PHP.NTS.8.5
+php81:
+- PHP.PHP.8.1
+- PHP.PHP.NTS.8.1
+php82:
+- PHP.PHP.8.2
+- PHP.PHP.NTS.8.2
+php83:
+- PHP.PHP.8.3
+- PHP.PHP.NTS.8.3
+php84:
+- PHP.PHP.8.4
+- PHP.PHP.NTS.8.4
+php85:
+- PHP.PHP.8.5
+- PHP.PHP.NTS.8.5
+pnpm:
+- pnpm.pnpm
+- pnpm.pnpm.preview
+prism:
+- Andrea.Prism
+- Stoplight.Prism
+q:
+- Pulkitxm.Quinjet
+- natesales.q
+readtags:
+- UniversalCtags.Ctags
+- UniversalCtags.Ctags.Nightly
+rig:
+- RigSmith.Rig
+- RigSmith.Rigsmith
+runx:
+- CatBraaain.runx
+- horihiro.runx
+shiprig:
+- RigSmith.Rigsmith
+- RigSmith.ShipRig
+upbrr:
+- autobrr.upbrr.cli
+- autobrr.upbrr.gui
+watch:
+- 54145a.145watch
+- echocat.watch
+wfrog:
+- Wfrog.Wfrog
+- Wfrog.Wfrog.SVN
+whois:
+- Akaere.whois
+- Microsoft.Sysinternals.Whois
+winsw:
+- CloudBees.WindowsServiceWrapper
+- CloudBees.WindowsServiceWrapper.3
+wt:
+- WorldTimeCLI.WorldTimeCLI
+- akesh0805.WorldTimeCli
+wtop:
+- Cingano.wtop
+- lpl2103.wtop
+- michaelsanford.wtop
+wtq:
+- flyingpie.windows-terminal-quake
+- flyingpie.windows-terminal-quake.prerelease
+yasm:
+- BrechtSanders.WinLibs.MCF.UCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT
+- BrechtSanders.WinLibs.POSIX.MSVCRT.LLVM
+- BrechtSanders.WinLibs.POSIX.UCRT
+- BrechtSanders.WinLibs.POSIX.UCRT.LLVM
+yt-dlp:
+- yt-dlp.yt-dlp
+- yt-dlp.yt-dlp.nightly

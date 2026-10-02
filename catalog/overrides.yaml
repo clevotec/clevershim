@@ -1,0 +1,21 @@
+# Shim-target priority and packages the portable-command heuristic must not drop.
+# Earlier package ids win for that command. This chooses the file a shim launches.
+# It does not move the shim ahead of an earlier PATH entry.
+priority:
+  ffmpeg:
+    - yt-dlp.FFmpeg
+    - Gyan.FFmpeg
+  ffprobe:
+    - yt-dlp.FFmpeg
+    - Gyan.FFmpeg
+  ffplay:
+    - yt-dlp.FFmpeg
+    - Gyan.FFmpeg
+force_include:
+  - id: Gyan.FFmpeg
+    commands:
+      - ffmpeg
+      - ffprobe
+      - ffplay
+force_exclude:
+  - Clevotec.CleverShim

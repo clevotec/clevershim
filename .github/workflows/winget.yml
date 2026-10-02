@@ -1,0 +1,71 @@
+name: winget
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require WINGET_TOKEN
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if [ -z "$WINGET_TOKEN" ]; then
+            echo "::error::WINGET_TOKEN is missing. The GitHub Release is already published. Komac was not run."
+            echo "Add a classic PAT with the public_repo scope as the WINGET_TOKEN secret, and a microsoft/winget-pkgs fork on the same account."
+            exit 1
+          fi
+      - name: Install Komac
+        run: |
+          curl -fsSL -o /tmp/komac.tar.gz -L "https://github.com/russellbanks/Komac/releases/download/v2.16.0/komac-2.16.0-x86_64-unknown-linux-gnu.tar.gz"
+          tar -xzf /tmp/komac.tar.gz -C /tmp
+          sudo mv /tmp/komac /usr/local/bin/komac
+          sudo apt-get update
+          sudo apt-get install -y expect
+      - name: Sync the winget-pkgs fork and submit Clevotec.CleverShim
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.release.tag_name }}"
+          version="${tag#v}"
+          url="https://github.com/${{ github.repository }}/releases/download/${tag}/clevershim-x86_64-pc-windows-msvc.exe"
+          komac sync --token "$WINGET_TOKEN"
+          if komac list Clevotec.CleverShim --token "$WINGET_TOKEN" >/tmp/komac-list.txt 2>/tmp/komac-list.err; then
+            komac update Clevotec.CleverShim \
+              --version "$version" \
+              --urls "$url" \
+              --submit \
+              --skip-pr-check \
+              --token "$WINGET_TOKEN"
+          else
+            # komac new prompts for an exe it cannot classify. Answer installer type exe
+            # (not portable) and silent switch /install, which winget install uses.
+            expect << EOF
+          set timeout 180
+          spawn komac new Clevotec.CleverShim --version "$version" --urls "$url" --submit --token "$WINGET_TOKEN" --publisher Clevotec --publisher-url "https://github.com/${{ github.repository }}" --package-name CleverShim --package-url "https://github.com/${{ github.repository }}" --package-locale en-US --license MIT --license-url "https://github.com/${{ github.repository }}/blob/main/LICENSE" --short-description "Stable PATH shims for winget portable packages" --description "CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe." --moniker clevershim --author Clevotec --copyright "Copyright Clevotec" --release-notes-url "https://github.com/${{ github.repository }}/releases/tag/${tag}"
+          expect "portable exe"
+          send "n\r"
+          expect "Silent switch"
+          send "/install\r"
+          expect "Silent with progress"
+          send "/install\r"
+          expect "Install modes"
+          send "\r"
+          expect "Installer return codes"
+          send "\r"
+          expect "Upgrade behavior"
+          send "\r"
+          expect "Commands"
+          send "clevershim\r"
+          expect "Protocols"
+          send "\r"
+          expect "File extensions"
+          send "\r"
+          expect eof
+          catch wait result
+          exit [lindex \$result 3]
+          EOF
+          fi
