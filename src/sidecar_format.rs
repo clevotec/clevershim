@@ -148,6 +148,19 @@ pub fn normalize_for_compare(path: &Path) -> String {
             std::path::Component::ParentDir => {
                 parts.pop();
             }
+            #[cfg(windows)]
+            std::path::Component::Prefix(prefix) => {
+                use std::path::Prefix;
+                parts.push(match prefix.kind() {
+                    Prefix::Disk(drive) | Prefix::VerbatimDisk(drive) => {
+                        format!("{}:", drive as char)
+                    }
+                    Prefix::UNC(server, share) | Prefix::VerbatimUNC(server, share) => {
+                        format!(r"\\{}\{}", server.to_string_lossy(), share.to_string_lossy())
+                    }
+                    _ => prefix.as_os_str().to_string_lossy().into_owned(),
+                });
+            }
             other => parts.push(other.as_os_str().to_string_lossy().into_owned()),
         }
     }
@@ -242,6 +255,24 @@ mod tests {
             shim,
             bin,
             manager
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_verbatim_paths_cannot_bypass_bin_exclusion() {
+        for (target, bin) in [
+            (r"\\?\C:\Tools\bin\tool.exe", r"C:\Tools\bin"),
+            (r"\\?\UNC\server\share\bin\tool.exe", r"\\server\share\bin"),
+        ] {
+            let bin = Path::new(bin);
+            let shim = bin.join("other.exe");
+            let manager = bin.with_file_name("clevershim.exe");
+            assert!(is_forbidden_target(Path::new(target), &shim, bin, &manager));
+        }
+        assert!(!path_is_inside(
+            Path::new(r"\\?\C:\Tools\bin-other\tool.exe"),
+            Path::new(r"C:\Tools\bin")
         ));
     }
 }

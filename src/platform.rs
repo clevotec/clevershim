@@ -10,7 +10,9 @@ pub const UNINSTALL_KEY: &str =
 
 #[cfg(windows)]
 mod win {
+    use std::os::windows::process::CommandExt;
     use std::path::{Path, PathBuf};
+    use std::process::{Command, Stdio};
 
     use windows::core::{Interface, BSTR, PCWSTR, VARIANT};
     use windows::Win32::Foundation::LPARAM;
@@ -27,6 +29,7 @@ mod win {
         IExecAction, ILogonTrigger, ITaskService, TaskScheduler, TASK_ACTION_EXEC,
         TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_LUA, TASK_TRIGGER_LOGON,
     };
+    use windows::Win32::System::Threading::CREATE_NO_WINDOW;
     use windows::Win32::UI::Shell::IsUserAnAdmin;
     use windows::Win32::UI::WindowsAndMessaging::{
         SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
@@ -35,8 +38,37 @@ mod win {
     use super::{TASK_NAME, UNINSTALL_KEY};
     use crate::layout::Scope;
 
+    struct ComApartment;
+
+    impl Drop for ComApartment {
+        fn drop(&mut self) {
+            unsafe { CoUninitialize() };
+        }
+    }
+
     pub fn is_elevated() -> bool {
         unsafe { IsUserAnAdmin().as_bool() }
+    }
+
+    pub fn remove_self_after_exit(exe: &Path, system_root: &Path) -> Result<(), String> {
+        // Windows pins a running image. Pass paths as data, not interpolated script text.
+        Command::new(system_root.join("System32/WindowsPowerShell/v1.0/powershell.exe"))
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Wait-Process -Id $env:CLEVERSHIM_UNINSTALL_PID -ErrorAction SilentlyContinue; \
+                 Remove-Item -LiteralPath $env:CLEVERSHIM_UNINSTALL_TARGET -Force -ErrorAction Stop",
+            ])
+            .env("CLEVERSHIM_UNINSTALL_PID", std::process::id().to_string())
+            .env("CLEVERSHIM_UNINSTALL_TARGET", exe)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW.0)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        Ok(())
     }
 
     pub fn read_path(scope: Scope) -> Result<String, String> {
@@ -68,7 +100,8 @@ mod win {
 
     pub fn install_logon_task(exe: &Path) -> Result<(), String> {
         unsafe {
-            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(err)?;
+            let _apartment = ComApartment;
             let service: ITaskService =
                 CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER).map_err(err)?;
             service
@@ -88,7 +121,17 @@ mod win {
             principal.SetRunLevel(TASK_RUNLEVEL_LUA).map_err(err)?;
             let triggers = task.Triggers().map_err(err)?;
             let trigger = triggers.Create(TASK_TRIGGER_LOGON).map_err(err)?;
-            let _logon: ILogonTrigger = trigger.cast().map_err(err)?;
+            let logon: ILogonTrigger = trigger.cast().map_err(err)?;
+            // Non-admin callers may register only their own user's logon trigger.
+            let domain = service.ConnectedDomain().map_err(err)?;
+            let user = service.ConnectedUser().map_err(err)?;
+            let mut identity = Vec::with_capacity(domain.len() + user.len() + 1);
+            identity.extend_from_slice(domain.as_wide());
+            identity.push(b'\\' as u16);
+            identity.extend_from_slice(user.as_wide());
+            logon
+                .SetUserId(&BSTR::from_wide(&identity).map_err(err)?)
+                .map_err(err)?;
             let actions = task.Actions().map_err(err)?;
             let action = actions.Create(TASK_ACTION_EXEC).map_err(err)?;
             let exec: IExecAction = action.cast().map_err(err)?;
@@ -106,14 +149,14 @@ mod win {
                     &VARIANT::default(),
                 )
                 .map_err(err)?;
-            CoUninitialize();
         }
         Ok(())
     }
 
     pub fn remove_logon_task() -> Result<(), String> {
         unsafe {
-            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(err)?;
+            let _apartment = ComApartment;
             let service: ITaskService =
                 CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER).map_err(err)?;
             service
@@ -126,7 +169,6 @@ mod win {
                 .map_err(err)?;
             let folder = service.GetFolder(&BSTR::from("\\")).map_err(err)?;
             folder.DeleteTask(&BSTR::from(TASK_NAME), 0).map_err(err)?;
-            CoUninitialize();
         }
         Ok(())
     }

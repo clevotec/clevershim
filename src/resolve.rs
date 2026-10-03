@@ -542,10 +542,24 @@ mod tests {
     fn filetime_bump(older: &Path, newer: &Path) {
         let now = std::time::SystemTime::now();
         let earlier = now - std::time::Duration::from_secs(120);
-        fs::File::open(older)
-            .unwrap()
-            .set_modified(earlier)
-            .unwrap();
-        fs::File::open(newer).unwrap().set_modified(now).unwrap();
+        set_directory_modified(older, earlier);
+        set_directory_modified(newer, now);
+    }
+
+    fn set_directory_modified(path: &Path, modified: std::time::SystemTime) {
+        #[cfg(windows)]
+        let file = {
+            use std::os::windows::fs::OpenOptionsExt;
+            const FILE_WRITE_ATTRIBUTES: u32 = 0x100;
+            const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x02000000;
+            fs::OpenOptions::new()
+                .access_mode(FILE_WRITE_ATTRIBUTES)
+                .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+                .open(path)
+                .unwrap()
+        };
+        #[cfg(not(windows))]
+        let file = fs::File::open(path).unwrap();
+        file.set_modified(modified).unwrap();
     }
 }

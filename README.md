@@ -42,10 +42,10 @@ Hook activation is local configuration and does not propagate when pushed or clo
 
 - `clevershim setup` or `clevershim /install` copies the exe under `%LOCALAPPDATA%\Clevotec\CleverShim\`, appends `%LOCALAPPDATA%\Clevotec\CleverShim\bin` to the user PATH, syncs that user's packages, registers a logon task that runs `clevershim sync`, and writes an HKCU uninstall key.
 - An elevated install also creates `%ProgramData%\Clevotec\CleverShim\bin`, appends it to the system PATH, syncs machine-scope packages, and writes an HKLM uninstall key. A per-user install does not change the system PATH.
-- `clevershim /uninstall` removes the task, the PATH entry, that scope's shims, and its uninstall key.
+- `clevershim /uninstall` removes the task, the PATH entry, that scope's shims, and its uninstall key. When run from the installed manager, a hidden cleanup process removes that executable after it exits.
 - `clevershim sync` refreshes shims. `clevershim repair` rewrites one sidecar. `clevershim list` prints them. `clevershim hook install` and `clevershim hook remove` manage the logon task.
 
-The logon task runs as the user who logged on. It does not run at startup and it does not run on a timer. Machine-bin writes take a file lock. Directories are appended to PATH, never prepended, so an earlier dedicated `ffmpeg.exe` still wins while it exists.
+The logon task runs without elevation when the installing user logs on. Restricting the trigger to that user also lets a non-admin register it. It does not run at startup and it does not run on a timer. Machine-bin writes take a file lock. Directories are appended to PATH, never prepended, so an earlier dedicated `ffmpeg.exe` still wins while it exists.
 
 Each shim is `bin\<command>.exe` plus `bin\<command>.shim`. A `.bat` or `.cmd` target is started through `cmd.exe /c`. `.ps1` is not shimmed. A successful shim call prints nothing of its own. Repair details go to stderr only when repair fails.
 
@@ -53,9 +53,11 @@ A user file at `%LOCALAPPDATA%\clevershim\packages.yaml` can add packages. Overr
 
 ## Tests
 
-`cargo test` covers catalog parsing, package-directory matching, sidecar rewrite, one repair attempt, refusal to retarget a shim at itself or at `bin`, shim removal when a package is absent, and user overrides staying with that user.
+`cargo test` covers catalog parsing, package-directory matching, sidecar rewrite, one repair attempt, refusal to retarget a shim at itself or at `bin` (including Windows extended-length drive and UNC aliases), shim removal when a package is absent, and user overrides staying with that user.
 
 On Windows, `cargo test --release --test windows_shim` builds a fixture exe that needs a sibling DLL, deletes the original target, and checks that the same launch retargets and loads the DLL.
+
+For the complete release-mode suite, including the optional SQLite-backed scanner, run `cargo test --release --locked --all-features --no-fail-fast`, then `cargo build --release --locked --all-features`. Windows builds need the MSVC C++ tools and Windows SDK. Native installer verification should check both standard-user and elevated setup, the registry PATH entries and uninstall keys, the logon task, and installed-binary uninstall; unit tests alone do not exercise those operating-system effects.
 
 ## Release
 
