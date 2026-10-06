@@ -60,13 +60,13 @@ For the complete release-mode suite, including the optional SQLite-backed scanne
 
 ## Release
 
-Tag `v*` (or run the Release workflow manually with that tag) to build `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`, zip each with a SHA256 file, and publish a GitHub Release. The x64 exe is the winget installer (`Clevotec.CleverShim`, silent switch `/install`).
+Tag `v*` (or run the Release workflow manually with that tag) to build `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`, zip each with a SHA256 file, attest provenance, and publish a GitHub Release. The x64 exe is the winget installer (`Clevotec.CleverShim`, silent switch `/install`).
 
-The x64 manager includes Windows version metadata that Komac uses to recognize it as an EXE installer. The winget workflow sets `/install` as its silent switch.
+The x64 manager embeds Windows version metadata (`FileDescription` contains `installer`) so WinGet treats the asset as an EXE installer. The winget workflow hard-codes `/install` as the silent switch in the generated installer manifest.
 
-The winget workflow installs [Komac](https://github.com/russellbanks/Komac) and runs `komac sync`, then `komac new` for the first release or `komac update` after that. WinGet package submission needs:
+After a published release, `.github/workflows/winget.yml` submits the package through the GitHub API as `clevotec1`: it syncs the `clevotec1/winget-pkgs` fork to `microsoft/winget-pkgs`, writes the `Clevotec.CleverShim` version/installer/locale manifests under `manifests/c/Clevotec/CleverShim/<version>/`, and opens a PR to `microsoft/winget-pkgs` when one is not already open for that version. WinGet package submission needs:
 
 1. A public repository and public release assets (WinGet cannot download private installer URLs).
-2. A classic PAT in the repository `WINGET_TOKEN` secret (`public_repo` scope) and a `microsoft/winget-pkgs` fork on the same account.
+2. A classic PAT in the repository `WINGET_TOKEN` secret (`public_repo` scope) that belongs to `clevotec1`, plus a `microsoft/winget-pkgs` fork on that account (`clevotec1/winget-pkgs`).
 
 Without those, the GitHub Release still publishes and the winget job exits cleanly after reporting what is missing.

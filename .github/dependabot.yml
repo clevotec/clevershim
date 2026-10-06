@@ -1,11 +1,19 @@
 version: 2
 updates:
+  # Patch/minor Cargo bumps are grouped. Majors stay ungrouped for manual review
+  # (API-sensitive crates such as windows, zip, and rusqlite).
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    labels:
+      - dependencies
+      - cargo
     groups:
       cargo-patches:
         patterns:
@@ -23,7 +31,12 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 3
+    labels:
+      - dependencies
+      - github-actions
     groups:
       github-actions:
         patterns:

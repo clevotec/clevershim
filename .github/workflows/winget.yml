@@ -17,6 +17,8 @@ jobs:
   submit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Resolve release tag
         id: release
@@ -95,6 +97,7 @@ jobs:
 
           mkdir -p /tmp/manifests
           python3 - <<'PY'
+          from datetime import datetime, timezone
           from pathlib import Path
           import os
           version = os.environ["RELEASE_VERSION"]
@@ -102,11 +105,11 @@ jobs:
           sha256 = os.environ["INSTALLER_SHA256"]
           tag = os.environ["RELEASE_TAG"]
           repo = os.environ["REPOSITORY"]
-          release_date = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
+          release_date = datetime.now(timezone.utc).date().isoformat()
           root = Path("/tmp/manifests")
 
           (root / "Clevotec.CleverShim.yaml").write_text(
-          f"""# Created with clevershim release workflow
+          f"""# Created with clevershim winget workflow
           # yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.10.0.schema.json
 
           PackageIdentifier: Clevotec.CleverShim
@@ -119,7 +122,7 @@ jobs:
           )
 
           (root / "Clevotec.CleverShim.installer.yaml").write_text(
-          f"""# Created with clevershim release workflow
+          f"""# Created with clevershim winget workflow
           # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 
           PackageIdentifier: Clevotec.CleverShim
@@ -151,7 +154,7 @@ jobs:
           )
 
           (root / "Clevotec.CleverShim.locale.en-US.yaml").write_text(
-          f"""# Created with clevershim release workflow
+          f"""# Created with clevershim winget workflow
           # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
 
           PackageIdentifier: Clevotec.CleverShim
@@ -213,13 +216,21 @@ jobs:
           if [ -n "$existing" ]; then
             echo "Existing PR: $existing"
           else
+            prior=$(gh api "repos/microsoft/winget-pkgs/contents/manifests/c/Clevotec/CleverShim?ref=master" --jq 'length' 2>/dev/null || echo 0)
+            if [ "${prior:-0}" -gt 0 ]; then
+              pr_title="Update Clevotec.CleverShim to version ${RELEASE_VERSION}"
+              pr_intro="Update CleverShim in the Windows Package Manager community repository."
+            else
+              pr_title="New package: Clevotec.CleverShim version ${RELEASE_VERSION}"
+              pr_intro="First WinGet submission for CleverShim."
+            fi
             pr_url=$(gh pr create \
               --repo microsoft/winget-pkgs \
               --head "clevotec1:${branch}" \
               --base master \
-              --title "New package: Clevotec.CleverShim version ${RELEASE_VERSION}" \
+              --title "$pr_title" \
               --body "## Description
-          First WinGet submission for CleverShim.
+          ${pr_intro}
 
           - Package: \`Clevotec.CleverShim\`
           - Version: \`${RELEASE_VERSION}\`

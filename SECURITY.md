@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest released version of CleverShim on the default branch.
+Security fixes are applied to the latest released version of CleverShim on the default branch. Older tags are not maintained.
 
 ## Reporting a vulnerability
 
