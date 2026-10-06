@@ -3,35 +3,79 @@ name: winget
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to submit, such as v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   submit:
     runs-on: ubuntu-latest
     steps:
-      - name: Require WINGET_TOKEN
+      - name: Resolve release tag
+        id: release
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.tag }}" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.event.release.tag_name }}"
+          fi
+          if [[ ! "$tag" =~ ^v ]]; then
+            echo "::error::Release tag must start with v, got: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${{ github.repository }}/releases/download/${tag}/clevershim-x86_64-pc-windows-msvc.exe" >> "$GITHUB_OUTPUT"
+
+      - name: Require public package URL and WINGET_TOKEN
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
-          if [ -z "$WINGET_TOKEN" ]; then
-            echo "::error::WINGET_TOKEN is missing. The GitHub Release is already published. Komac was not run."
-            echo "Add a classic PAT with the public_repo scope as the WINGET_TOKEN secret, and a microsoft/winget-pkgs fork on the same account."
+          set -euo pipefail
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "::warning::Repository is private. WinGet cannot download private release assets. Make clevotec/clevershim public, then re-run this workflow."
+            echo "skip=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ -z "${WINGET_TOKEN:-}" ]; then
+            echo "::warning::WINGET_TOKEN is missing. The GitHub Release is already published. Komac was not run."
+            echo "Add a classic PAT with the public_repo scope as the WINGET_TOKEN repository secret, and a microsoft/winget-pkgs fork on the same account."
+            echo "skip=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/installer.bin -w "%{http_code}" -L "${{ steps.release.outputs.url }}")
+          if [ "$code" != "200" ]; then
+            echo "::error::Installer URL returned HTTP $code: ${{ steps.release.outputs.url }}"
             exit 1
           fi
+          echo "skip=false" >> "$GITHUB_ENV"
+
       - name: Install Komac
+        if: env.skip != 'true'
         run: |
+          set -euo pipefail
           curl -fsSL -o /tmp/komac.tar.gz -L "https://github.com/russellbanks/Komac/releases/download/v2.16.0/komac-2.16.0-x86_64-unknown-linux-gnu.tar.gz"
           tar -xzf /tmp/komac.tar.gz -C /tmp
           sudo mv /tmp/komac /usr/local/bin/komac
           sudo apt-get update
           sudo apt-get install -y expect
+
       - name: Sync the winget-pkgs fork and submit Clevotec.CleverShim
+        if: env.skip != 'true'
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
           set -euo pipefail
-          tag="${{ github.event.release.tag_name }}"
-          version="${tag#v}"
-          url="https://github.com/${{ github.repository }}/releases/download/${tag}/clevershim-x86_64-pc-windows-msvc.exe"
+          version="${{ steps.release.outputs.version }}"
+          url="${{ steps.release.outputs.url }}"
+          tag="${{ steps.release.outputs.tag }}"
           komac sync --token "$WINGET_TOKEN"
           if komac list Clevotec.CleverShim --token "$WINGET_TOKEN" >/tmp/komac-list.txt 2>/tmp/komac-list.err; then
             komac update Clevotec.CleverShim \
