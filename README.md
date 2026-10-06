@@ -53,7 +53,7 @@ A user file at `%LOCALAPPDATA%\clevershim\packages.yaml` can add packages. Overr
 
 ## Tests
 
-`cargo test` covers catalog parsing, package-directory matching, sidecar rewrite, one repair attempt, refusal to retarget a shim at itself or at `bin` (including Windows extended-length drive and UNC aliases), shim removal when a package is absent, and user overrides staying with that user.
+`cargo test` covers catalog parsing, package-directory matching, sidecar rewrite, one repair attempt, refusal to retarget a shim at itself or at `bin` (including Windows extended-length drive/UNC and 8.3 short-path aliases), shim removal when a package is absent, and user overrides staying with that user.
 
 On Windows, `cargo test --release --test windows_shim` builds a fixture exe that needs a sibling DLL, deletes the original target, and checks that the same launch retargets and loads the DLL.
 

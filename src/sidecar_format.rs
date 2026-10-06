@@ -131,8 +131,8 @@ fn push(out: &mut String, key: &str, value: &str) {
 }
 
 pub fn paths_equal(left: &Path, right: &Path) -> bool {
-    let left = normalize_for_compare(left);
-    let right = normalize_for_compare(right);
+    let left = normalize_for_compare(&resolve_for_compare(left));
+    let right = normalize_for_compare(&resolve_for_compare(right));
     if cfg!(windows) {
         left.eq_ignore_ascii_case(&right)
     } else {
@@ -173,9 +173,14 @@ pub fn normalize_for_compare(path: &Path) -> String {
     }
 }
 
+/// Prefer the OS-resolved path so short names and junctions match canonicalized targets.
+pub fn resolve_for_compare(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
 pub fn path_is_inside(path: &Path, dir: &Path) -> bool {
-    let path = normalize_for_compare(path);
-    let dir = normalize_for_compare(dir);
+    let path = normalize_for_compare(&resolve_for_compare(path));
+    let dir = normalize_for_compare(&resolve_for_compare(dir));
     if path == dir {
         return true;
     }
@@ -274,5 +279,60 @@ mod tests {
             Path::new(r"\\?\C:\Tools\bin-other\tool.exe"),
             Path::new(r"C:\Tools\bin")
         ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn short_path_aliases_cannot_bypass_bin_exclusion() {
+        let root = crate::testutil::temp_dir("sidecar-short");
+        let bin = root.join("bin");
+        let shim = bin.join("ffmpeg.exe");
+        let manager = root.join("clevershim.exe");
+        let decoy = bin.join("ffprobe.exe");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(&shim, b"shim").unwrap();
+        fs::write(&manager, b"mgr").unwrap();
+        fs::write(&decoy, b"decoy").unwrap();
+
+        let short_bin = short_path(&bin).unwrap_or_else(|| bin.clone());
+        let short_shim = short_path(&shim).unwrap_or_else(|| shim.clone());
+        let short_manager = short_path(&manager).unwrap_or_else(|| manager.clone());
+        let canonical_decoy = fs::canonicalize(&decoy).unwrap();
+
+        assert!(paths_equal(&shim, &short_shim));
+        assert!(path_is_inside(&canonical_decoy, &short_bin));
+        assert!(is_forbidden_target(
+            &canonical_decoy,
+            &short_shim,
+            &short_bin,
+            &short_manager
+        ));
+    }
+
+    #[cfg(windows)]
+    fn short_path(path: &Path) -> Option<PathBuf> {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetShortPathNameW(
+                long_path: *const u16,
+                short_path: *mut u16,
+                buffer_len: u32,
+            ) -> u32;
+        }
+
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+        let needed = unsafe { GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0) };
+        if needed == 0 {
+            return None;
+        }
+        let mut buf = vec![0u16; needed as usize];
+        let written = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), needed) };
+        if written == 0 || written >= needed {
+            return None;
+        }
+        Some(PathBuf::from(OsString::from_wide(&buf[..written as usize])))
     }
 }

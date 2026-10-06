@@ -269,8 +269,8 @@ fn path_starts_with(path: &Path, root: &Path) -> bool {
     if root.as_os_str().is_empty() {
         return false;
     }
-    let path = sidecar_format::normalize_for_compare(path);
-    let root = sidecar_format::normalize_for_compare(root);
+    let path = sidecar_format::normalize_for_compare(&sidecar_format::resolve_for_compare(path));
+    let root = sidecar_format::normalize_for_compare(&sidecar_format::resolve_for_compare(root));
     path == root || path.starts_with(&format!("{root}{}", std::path::MAIN_SEPARATOR))
 }
 
@@ -522,13 +522,18 @@ mod tests {
         touch(&manager, b"mgr");
         // Package directory is the bin itself via install location.
         let locations = vec![bin.clone()];
+        // Hosted Windows runners often expose TEMP via 8.3 aliases while
+        // canonicalize() returns the long form; roots must still match.
+        let shim_root = short_path(&shim).unwrap_or_else(|| shim.clone());
+        let bin_root = short_path(&bin).unwrap_or_else(|| bin.clone());
+        let manager_root = short_path(&manager).unwrap_or_else(|| manager.clone());
         let context = ctx(
             &tree,
             "ffmpeg",
             "Demo.Tool",
-            &shim,
-            &bin,
-            &manager,
+            &shim_root,
+            &bin_root,
+            &manager_root,
             &locations,
         );
         let hit = resolve(&context);
@@ -561,5 +566,37 @@ mod tests {
         #[cfg(not(windows))]
         let file = fs::File::open(path).unwrap();
         file.set_modified(modified).unwrap();
+    }
+
+    #[cfg(windows)]
+    fn short_path(path: &Path) -> Option<PathBuf> {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetShortPathNameW(
+                long_path: *const u16,
+                short_path: *mut u16,
+                buffer_len: u32,
+            ) -> u32;
+        }
+
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+        let needed = unsafe { GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0) };
+        if needed == 0 {
+            return None;
+        }
+        let mut buf = vec![0u16; needed as usize];
+        let written = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), needed) };
+        if written == 0 || written >= needed {
+            return None;
+        }
+        Some(PathBuf::from(OsString::from_wide(&buf[..written as usize])))
+    }
+
+    #[cfg(not(windows))]
+    fn short_path(_path: &Path) -> Option<PathBuf> {
+        None
     }
 }
