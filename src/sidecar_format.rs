@@ -160,7 +160,11 @@ pub fn normalize_for_compare(path: &Path) -> String {
                         format!("{}:", drive as char)
                     }
                     Prefix::UNC(server, share) | Prefix::VerbatimUNC(server, share) => {
-                        format!(r"\\{}\{}", server.to_string_lossy(), share.to_string_lossy())
+                        format!(
+                            r"\\{}\{}",
+                            server.to_string_lossy(),
+                            share.to_string_lossy()
+                        )
                     }
                     _ => prefix.as_os_str().to_string_lossy().into_owned(),
                 });

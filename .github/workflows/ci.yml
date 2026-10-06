@@ -13,6 +13,45 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: clevershim-ci-lint
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install cargo-audit
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv0.22.2/cargo-audit-x86_64-unknown-linux-musl-v0.22.2.tgz" \
+            -o /tmp/cargo-audit.tgz
+          tar -xzf /tmp/cargo-audit.tgz -C /tmp
+          sudo install -m 755 /tmp/cargo-audit-x86_64-unknown-linux-musl-v0.22.2/cargo-audit /usr/local/bin/cargo-audit
+          cargo-audit --version
+
+      - name: Audit Rust dependencies
+        run: cargo audit
+
   catalog-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -47,6 +86,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -57,6 +98,9 @@ jobs:
         with:
           name: winget-catalog
           path: catalog
+
+      - name: Clippy Windows targets (deny warnings)
+        run: cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
 
       - name: Build the shim stub
         run: cargo build --locked --release --bin clevershim-shim

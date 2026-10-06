@@ -277,12 +277,7 @@ fn judge(ctx: &ResolveContext<'_>, path: &Path) -> Result<ResolvedTarget, String
     if is_other_scope(ctx, &real) {
         return Err("other scope".into());
     }
-    if sidecar_format::is_forbidden_target_resolved(
-        &real,
-        ctx.shim_exe,
-        ctx.bin_dir,
-        ctx.manager,
-    ) {
+    if sidecar_format::is_forbidden_target_resolved(&real, ctx.shim_exe, ctx.bin_dir, ctx.manager) {
         return Err("self-target".into());
     }
     Ok(target_from_path(ctx, real))

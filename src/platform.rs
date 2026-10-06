@@ -101,7 +101,9 @@ mod win {
 
     pub fn install_logon_task(exe: &Path) -> Result<(), String> {
         unsafe {
-            CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(err)?;
+            CoInitializeEx(None, COINIT_MULTITHREADED)
+                .ok()
+                .map_err(err)?;
             let _apartment = ComApartment;
             let service: ITaskService =
                 CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER).map_err(err)?;
@@ -130,9 +132,7 @@ mod win {
             identity.extend_from_slice(&domain);
             identity.push(b'\\' as u16);
             identity.extend_from_slice(&user);
-            logon
-                .SetUserId(&BSTR::from_wide(&identity))
-                .map_err(err)?;
+            logon.SetUserId(&BSTR::from_wide(&identity)).map_err(err)?;
             let actions = task.Actions().map_err(err)?;
             let action = actions.Create(TASK_ACTION_EXEC).map_err(err)?;
             let exec: IExecAction = action.cast().map_err(err)?;
@@ -156,7 +156,9 @@ mod win {
 
     pub fn remove_logon_task() -> Result<(), String> {
         unsafe {
-            CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(err)?;
+            CoInitializeEx(None, COINIT_MULTITHREADED)
+                .ok()
+                .map_err(err)?;
             let _apartment = ComApartment;
             let service: ITaskService =
                 CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER).map_err(err)?;
