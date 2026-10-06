@@ -28,7 +28,7 @@ jobs:
         run: cargo run --locked --release --features scan --bin clevershim-scan -- --out catalog/packages.yaml --overrides catalog/overrides.yaml
 
       - name: Test catalog, path matching, and sidecar logic
-        run: cargo test --locked --workspace
+        run: cargo test --locked --workspace -- --test-threads=1
 
       - name: Upload the scanned catalog
         uses: actions/upload-artifact@v4
