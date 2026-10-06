@@ -17,6 +17,8 @@ concurrency:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   scan:
@@ -94,6 +96,13 @@ jobs:
           Get-FileHash "dist/$name.zip","dist/clevershim-${{ matrix.target }}.exe" -Algorithm SHA256 |
             ForEach-Object { "{0}  {1}" -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf) } |
             Set-Content "dist/$name.sha256"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/clevershim-${{ matrix.target }}.exe
+            dist/clevershim-${{ inputs.tag || github.ref_name }}-${{ matrix.target }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
