@@ -69,7 +69,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y expect
 
-      - name: Sync the winget-pkgs fork and submit Clevotec.CleverShim
+      - name: Sync clevotec1/winget-pkgs with upstream via GitHub API
+        if: env.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          set -euo pipefail
+          login=$(gh api user --jq .login)
+          if [ "$login" != "clevotec1" ]; then
+            echo "::error::WINGET_TOKEN must belong to clevotec1 (got: $login)"
+            exit 1
+          fi
+          # Fast fork sync. Avoids komac sync, which can hang while rewriting a huge winget-pkgs fork.
+          if ! gh api -X POST "repos/clevotec1/winget-pkgs/merge-upstream" -f branch=master; then
+            echo "::warning::merge-upstream failed; attempting a force sync through the fork default branch tip"
+            upstream=$(gh api repos/microsoft/winget-pkgs/git/ref/heads/master --jq .object.sha)
+            gh api -X PATCH "repos/clevotec1/winget-pkgs/git/refs/heads/master" -f sha="$upstream" -F force=true >/dev/null
+          fi
+          gh api repos/clevotec1/winget-pkgs --jq '{full_name,default_branch,pushed_at,parent:.parent.full_name}'
+
+      - name: Submit Clevotec.CleverShim with Komac
         if: env.skip != 'true'
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
@@ -79,7 +98,6 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          komac sync --token "$WINGET_TOKEN"
           if komac list Clevotec.CleverShim --token "$WINGET_TOKEN" >/tmp/komac-list.txt 2>/tmp/komac-list.err; then
             komac update Clevotec.CleverShim \
               --version "$RELEASE_VERSION" \
@@ -89,27 +107,20 @@ jobs:
               --token "$WINGET_TOKEN"
           else
             expect <<'EOF'
-          set timeout 180
-          spawn komac new Clevotec.CleverShim --version $env(RELEASE_VERSION) --urls $env(RELEASE_URL) --submit --token $env(WINGET_TOKEN) --publisher Clevotec --publisher-url "https://github.com/$env(REPOSITORY)" --package-name CleverShim --package-url "https://github.com/$env(REPOSITORY)" --package-locale en-US --license MIT --license-url "https://github.com/$env(REPOSITORY)/blob/main/LICENSE" --short-description "Stable PATH shims for winget portable packages" --description "CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe." --moniker clevershim --author Clevotec --copyright "Copyright Clevotec" --release-notes-url "https://github.com/$env(REPOSITORY)/releases/tag/$env(RELEASE_TAG)"
-          expect "portable exe"
-          send "n\r"
-          expect "Silent switch"
-          send "/install\r"
-          expect "Silent with progress"
-          send "/install\r"
-          expect "Install modes"
-          send "\r"
-          expect "Installer return codes"
-          send "\r"
-          expect "Upgrade behavior"
-          send "\r"
-          expect "Commands"
-          send "clevershim\r"
-          expect "Protocols"
-          send "\r"
-          expect "File extensions"
-          send "\r"
-          expect eof
+          set timeout 300
+          spawn komac new Clevotec.CleverShim --version $env(RELEASE_VERSION) --urls $env(RELEASE_URL) --submit --skip-pr-check --token $env(WINGET_TOKEN) --publisher Clevotec --publisher-url "https://github.com/$env(REPOSITORY)" --package-name CleverShim --package-url "https://github.com/$env(REPOSITORY)" --package-locale en-US --license MIT --license-url "https://github.com/$env(REPOSITORY)/blob/main/LICENSE" --short-description "Stable PATH shims for winget portable packages" --description "CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe." --moniker clevershim --author Clevotec --copyright "Copyright Clevotec" --release-notes-url "https://github.com/$env(REPOSITORY)/releases/tag/$env(RELEASE_TAG)"
+          expect {
+            -re {(?i)portable exe} { send "n\r"; exp_continue }
+            -re {(?i)Silent switch} { send "/install\r"; exp_continue }
+            -re {(?i)Silent with progress} { send "/install\r"; exp_continue }
+            -re {(?i)Install modes} { send "\r"; exp_continue }
+            -re {(?i)Installer return codes} { send "\r"; exp_continue }
+            -re {(?i)Upgrade behavior} { send "\r"; exp_continue }
+            -re {(?i)Commands} { send "clevershim\r"; exp_continue }
+            -re {(?i)Protocols} { send "\r"; exp_continue }
+            -re {(?i)File extensions} { send "\r"; exp_continue }
+            eof
+          }
           catch wait result
           exit [lindex $result 3]
           EOF
