@@ -331,6 +331,12 @@ mod tests {
         fs::write(&decoy, b"decoy").unwrap();
 
         let short_bin = short_path(&bin).unwrap_or_else(|| bin.clone());
+        let canonical_bin = fs::canonicalize(&bin).unwrap();
+        if normalize_for_compare(&short_bin) == normalize_for_compare(&canonical_bin) {
+            eprintln!("Skipping short-path test: this volume does not provide an 8.3 alias");
+            fs::remove_dir_all(&root).unwrap();
+            return;
+        }
         let short_shim = short_path(&shim).unwrap_or_else(|| shim.clone());
         let short_manager = short_path(&manager).unwrap_or_else(|| manager.clone());
         let canonical_decoy = fs::canonicalize(&decoy).unwrap();
