@@ -178,6 +178,7 @@ impl BinLock {
         fs::create_dir_all(bin)?;
         let file = fs::OpenOptions::new()
             .create(true)
+            .truncate(true)
             .read(true)
             .write(true)
             .open(bin.join(".lock"))?;

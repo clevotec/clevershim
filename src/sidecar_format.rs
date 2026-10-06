@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 /// Sidecar written next to a shim exe. The stub and the manager share this text format.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Sidecar {
     pub command: String,
     pub package_id: String,
@@ -14,22 +14,6 @@ pub struct Sidecar {
     pub working_directory: String,
     pub path_prefix: bool,
     pub manager: String,
-}
-
-impl Default for Sidecar {
-    fn default() -> Self {
-        Self {
-            command: String::new(),
-            package_id: String::new(),
-            scope: String::new(),
-            target: String::new(),
-            runner: String::new(),
-            runner_args: Vec::new(),
-            working_directory: String::new(),
-            path_prefix: false,
-            manager: String::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

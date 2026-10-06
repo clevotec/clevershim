@@ -190,7 +190,7 @@ fn consider_dir_files(
 ) {
     let mut found = Vec::new();
     collect_named_files(dir, names, 8, 0, &mut found);
-    found.sort_by(|left, right| file_rank(left).cmp(&file_rank(right)));
+    found.sort_by_key(|left| file_rank(left));
     for (path, _depth) in found {
         match judge(ctx, &path) {
             Ok(resolved) => {

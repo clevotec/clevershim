@@ -209,16 +209,13 @@ fn remove_scope(layout: &Layout, scope: Scope) -> Result<()> {
     if root.exists() {
         for entry in fs::read_dir(&root).into_iter().flatten().flatten() {
             let path = entry.path();
-            if path.is_file() {
-                if fs::remove_file(&path).is_err() {
-                    #[cfg(windows)]
-                    if env::current_exe()
-                        .map(|exe| crate::sidecar_format::paths_equal(&path, &exe))
-                        .unwrap_or(false)
-                    {
-                        platform::remove_self_after_exit(&path, &layout.system_root)
-                            .map_err(plain)?;
-                    }
+            if path.is_file() && fs::remove_file(&path).is_err() {
+                #[cfg(windows)]
+                if env::current_exe()
+                    .map(|exe| crate::sidecar_format::paths_equal(&path, &exe))
+                    .unwrap_or(false)
+                {
+                    platform::remove_self_after_exit(&path, &layout.system_root).map_err(plain)?;
                 }
             }
         }
@@ -302,6 +299,7 @@ fn machine_writable(layout: &Layout) -> bool {
     fs::create_dir_all(layout.machine_bin()).is_ok()
         && fs::OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(layout.machine_bin().join(".lock"))
             .is_ok()

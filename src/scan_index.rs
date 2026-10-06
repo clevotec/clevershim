@@ -312,7 +312,7 @@ fn fetch_manifests(
     let mut bodies = HashMap::new();
     for (id, result) in rx {
         done += 1;
-        if done % 200 == 0 || done == total {
+        if done.is_multiple_of(200) || done == total {
             eprintln!("manifests {done}/{total}");
         }
         bodies.insert(id, result);
