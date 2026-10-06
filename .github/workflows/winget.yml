@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to submit, such as v0.1.0"
+        description: "Existing release tag to submit, such as v0.1.0"
         required: true
         type: string
 
@@ -16,6 +16,7 @@ permissions:
 jobs:
   submit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Resolve release tag
         id: release
@@ -66,8 +67,6 @@ jobs:
           curl -fsSL -o /tmp/komac.tar.gz -L "https://github.com/russellbanks/Komac/releases/download/v2.16.0/komac-2.16.0-x86_64-unknown-linux-gnu.tar.gz"
           tar -xzf /tmp/komac.tar.gz -C /tmp
           sudo mv /tmp/komac /usr/local/bin/komac
-          sudo apt-get update
-          sudo apt-get install -y expect
 
       - name: Sync clevotec1/winget-pkgs with upstream via GitHub API
         if: env.skip != 'true'
@@ -92,36 +91,42 @@ jobs:
         if: env.skip != 'true'
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
           RELEASE_URL: ${{ steps.release.outputs.url }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          # Prefer update when the package already exists. For first publish, feed installer
+          # answers over a PTY so komac does not hang waiting on an interactive TTY.
           if komac list Clevotec.CleverShim --token "$WINGET_TOKEN" >/tmp/komac-list.txt 2>/tmp/komac-list.err; then
-            komac update Clevotec.CleverShim \
+            timeout 15m komac update Clevotec.CleverShim \
               --version "$RELEASE_VERSION" \
               --urls "$RELEASE_URL" \
               --submit \
               --skip-pr-check \
               --token "$WINGET_TOKEN"
           else
-            expect <<'EOF'
-          set timeout 300
-          spawn komac new Clevotec.CleverShim --version $env(RELEASE_VERSION) --urls $env(RELEASE_URL) --submit --skip-pr-check --token $env(WINGET_TOKEN) --publisher Clevotec --publisher-url "https://github.com/$env(REPOSITORY)" --package-name CleverShim --package-url "https://github.com/$env(REPOSITORY)" --package-locale en-US --license MIT --license-url "https://github.com/$env(REPOSITORY)/blob/main/LICENSE" --short-description "Stable PATH shims for winget portable packages" --description "CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe." --moniker clevershim --author Clevotec --copyright "Copyright Clevotec" --release-notes-url "https://github.com/$env(REPOSITORY)/releases/tag/$env(RELEASE_TAG)"
-          expect {
-            -re {(?i)portable exe} { send "n\r"; exp_continue }
-            -re {(?i)Silent switch} { send "/install\r"; exp_continue }
-            -re {(?i)Silent with progress} { send "/install\r"; exp_continue }
-            -re {(?i)Install modes} { send "\r"; exp_continue }
-            -re {(?i)Installer return codes} { send "\r"; exp_continue }
-            -re {(?i)Upgrade behavior} { send "\r"; exp_continue }
-            -re {(?i)Commands} { send "clevershim\r"; exp_continue }
-            -re {(?i)Protocols} { send "\r"; exp_continue }
-            -re {(?i)File extensions} { send "\r"; exp_continue }
-            eof
-          }
-          catch wait result
-          exit [lindex $result 3]
-          EOF
+            answers=$'n\n/install\n/install\n\n\n\nclevershim\n\n\n'
+            # script(1) allocates a PTY; printf supplies the EXE installer questionnaire.
+            timeout 15m script -q -e -c "printf '%s' \"$answers\" | komac new Clevotec.CleverShim \
+              --version \"$RELEASE_VERSION\" \
+              --urls \"$RELEASE_URL\" \
+              --submit \
+              --skip-pr-check \
+              --token \"$WINGET_TOKEN\" \
+              --publisher Clevotec \
+              --publisher-url \"https://github.com/$REPOSITORY\" \
+              --package-name CleverShim \
+              --package-url \"https://github.com/$REPOSITORY\" \
+              --package-locale en-US \
+              --license MIT \
+              --license-url \"https://github.com/$REPOSITORY/blob/main/LICENSE\" \
+              --short-description \"Stable PATH shims for winget portable packages\" \
+              --description \"CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe.\" \
+              --moniker clevershim \
+              --author Clevotec \
+              --copyright \"Copyright Clevotec\" \
+              --release-notes-url \"https://github.com/$REPOSITORY/releases/tag/$RELEASE_TAG\"" /dev/null
           fi
