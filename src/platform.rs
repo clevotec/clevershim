@@ -14,8 +14,8 @@ mod win {
     use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
 
-    use windows::core::{Interface, BSTR, PCWSTR, VARIANT};
-    use windows::Win32::Foundation::LPARAM;
+    use windows::core::{Interface, BSTR, PCWSTR, PWSTR};
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
         COINIT_MULTITHREADED,
@@ -30,6 +30,7 @@ mod win {
         TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_LUA, TASK_TRIGGER_LOGON,
     };
     use windows::Win32::System::Threading::CREATE_NO_WINDOW;
+    use windows::Win32::System::Variant::VARIANT;
     use windows::Win32::UI::Shell::IsUserAnAdmin;
     use windows::Win32::UI::WindowsAndMessaging::{
         SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
@@ -88,7 +89,7 @@ mod win {
             SendMessageTimeoutW(
                 HWND_BROADCAST,
                 WM_SETTINGCHANGE,
-                None,
+                WPARAM::default(),
                 LPARAM(wide.as_ptr() as isize),
                 SMTO_ABORTIFHUNG,
                 5000,
@@ -126,11 +127,11 @@ mod win {
             let domain = service.ConnectedDomain().map_err(err)?;
             let user = service.ConnectedUser().map_err(err)?;
             let mut identity = Vec::with_capacity(domain.len() + user.len() + 1);
-            identity.extend_from_slice(domain.as_wide());
+            identity.extend_from_slice(&domain);
             identity.push(b'\\' as u16);
-            identity.extend_from_slice(user.as_wide());
+            identity.extend_from_slice(&user);
             logon
-                .SetUserId(&BSTR::from_wide(&identity).map_err(err)?)
+                .SetUserId(&BSTR::from_wide(&identity))
                 .map_err(err)?;
             let actions = task.Actions().map_err(err)?;
             let action = actions.Create(TASK_ACTION_EXEC).map_err(err)?;
@@ -189,7 +190,7 @@ mod win {
             status(RegCreateKeyExW(
                 hive,
                 PCWSTR(path.as_ptr()),
-                0,
+                None,
                 None,
                 windows::Win32::System::Registry::REG_OPTION_NON_VOLATILE,
                 KEY_SET_VALUE | KEY_WOW64_64KEY,
@@ -245,7 +246,7 @@ mod win {
                 RegOpenKeyExW(
                     hive,
                     PCWSTR(wide_root.as_ptr()),
-                    0,
+                    None,
                     KEY_READ | KEY_WOW64_64KEY,
                     &mut root,
                 )
@@ -261,10 +262,10 @@ mod win {
                     RegEnumKeyExW(
                         root,
                         index,
-                        windows::core::PWSTR(name.as_mut_ptr()),
+                        Some(PWSTR(name.as_mut_ptr())),
                         &mut name_len,
                         None,
-                        windows::core::PWSTR::null(),
+                        None,
                         None,
                         None,
                     )
@@ -311,7 +312,7 @@ mod win {
             status(RegOpenKeyExW(
                 hive,
                 PCWSTR(sub.as_ptr()),
-                0,
+                None,
                 KEY_READ | KEY_WOW64_64KEY,
                 &mut key,
             ))?;
@@ -364,7 +365,7 @@ mod win {
             status(RegCreateKeyExW(
                 hive,
                 PCWSTR(sub.as_ptr()),
-                0,
+                None,
                 None,
                 windows::Win32::System::Registry::REG_OPTION_NON_VOLATILE,
                 KEY_SET_VALUE | KEY_WOW64_64KEY,
@@ -393,7 +394,7 @@ mod win {
             status(RegSetValueExW(
                 key,
                 PCWSTR(name.as_ptr()),
-                0,
+                None,
                 kind,
                 Some(&bytes),
             ))?;
@@ -408,7 +409,7 @@ mod win {
             status(RegSetValueExW(
                 key,
                 PCWSTR(name.as_ptr()),
-                0,
+                None,
                 REG_DWORD,
                 Some(&bytes),
             ))?;
