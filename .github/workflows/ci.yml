@@ -66,5 +66,13 @@ jobs:
           Copy-Item target\release\clevershim-shim.exe assets\clevershim-shim.exe
           cargo build --locked --release --bin clevershim
 
+      - name: Verify WinGet installer metadata
+        shell: pwsh
+        run: |
+          $description = (Get-Item target\release\clevershim.exe).VersionInfo.FileDescription
+          if ($description -notmatch '(?i)installer|setup') {
+            throw "WinGet requires EXE installer metadata; FileDescription was '$description'"
+          }
+
       - name: Run release tests including Windows repair coverage
         run: cargo test --locked --release --all-features -- --test-threads=1

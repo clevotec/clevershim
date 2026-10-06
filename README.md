@@ -63,6 +63,8 @@ For the complete release-mode suite, including the optional SQLite-backed scanne
 
 Tag `v*` (or run the Release workflow manually with that tag) to build `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`, zip each with a SHA256 file, and publish a GitHub Release. The x64 exe is the winget installer (`Clevotec.CleverShim`, silent switch `/install`).
 
+The x64 manager includes Windows version metadata that Komac uses to recognize it as an EXE installer. The winget workflow sets `/install` as its silent switch.
+
 The winget workflow installs [Komac](https://github.com/russellbanks/Komac) and runs `komac sync`, then `komac new` for the first release or `komac update` after that. WinGet package submission needs:
 
 1. A public repository and public release assets (WinGet cannot download private installer URLs).
