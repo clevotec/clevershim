@@ -19,40 +19,42 @@ jobs:
     steps:
       - name: Resolve release tag
         id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [ -n "${{ inputs.tag }}" ]; then
-            tag="${{ inputs.tag }}"
-          else
-            tag="${{ github.event.release.tag_name }}"
-          fi
+          tag="${INPUT_TAG:-$EVENT_TAG}"
           if [[ ! "$tag" =~ ^v ]]; then
             echo "::error::Release tag must start with v, got: $tag"
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "url=https://github.com/${{ github.repository }}/releases/download/${tag}/clevershim-x86_64-pc-windows-msvc.exe" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${REPOSITORY}/releases/download/${tag}/clevershim-x86_64-pc-windows-msvc.exe" >> "$GITHUB_OUTPUT"
 
       - name: Require public package URL and WINGET_TOKEN
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event.repository.private }}" = "true" ]; then
+          if [ "$REPOSITORY_PRIVATE" = "true" ]; then
             echo "::warning::Repository is private. WinGet cannot download private release assets. Make clevotec/clevershim public, then re-run this workflow."
             echo "skip=true" >> "$GITHUB_ENV"
             exit 0
           fi
           if [ -z "${WINGET_TOKEN:-}" ]; then
             echo "::warning::WINGET_TOKEN is missing. The GitHub Release is already published. Komac was not run."
-            echo "Add a classic PAT with the public_repo scope as the WINGET_TOKEN repository secret, and a microsoft/winget-pkgs fork on the same account."
+            echo "Add a classic PAT with the public_repo scope as the WINGET_TOKEN secret, and a microsoft/winget-pkgs fork on the same account."
             echo "skip=true" >> "$GITHUB_ENV"
             exit 0
           fi
-          code=$(curl -sS -o /tmp/installer.bin -w "%{http_code}" -L "${{ steps.release.outputs.url }}")
+          code=$(curl -sS -o /tmp/installer.bin -w "%{http_code}" -L "$RELEASE_URL")
           if [ "$code" != "200" ]; then
-            echo "::error::Installer URL returned HTTP $code: ${{ steps.release.outputs.url }}"
+            echo "::error::Installer URL returned HTTP $code: $RELEASE_URL"
             exit 1
           fi
           echo "skip=false" >> "$GITHUB_ENV"
@@ -71,25 +73,24 @@ jobs:
         if: env.skip != 'true'
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          version="${{ steps.release.outputs.version }}"
-          url="${{ steps.release.outputs.url }}"
-          tag="${{ steps.release.outputs.tag }}"
           komac sync --token "$WINGET_TOKEN"
           if komac list Clevotec.CleverShim --token "$WINGET_TOKEN" >/tmp/komac-list.txt 2>/tmp/komac-list.err; then
             komac update Clevotec.CleverShim \
-              --version "$version" \
-              --urls "$url" \
+              --version "$RELEASE_VERSION" \
+              --urls "$RELEASE_URL" \
               --submit \
               --skip-pr-check \
               --token "$WINGET_TOKEN"
           else
-            # komac new prompts for an exe it cannot classify. Answer installer type exe
-            # (not portable) and silent switch /install, which winget install uses.
-            expect << EOF
+            expect <<'EOF'
           set timeout 180
-          spawn komac new Clevotec.CleverShim --version "$version" --urls "$url" --submit --token "$WINGET_TOKEN" --publisher Clevotec --publisher-url "https://github.com/${{ github.repository }}" --package-name CleverShim --package-url "https://github.com/${{ github.repository }}" --package-locale en-US --license MIT --license-url "https://github.com/${{ github.repository }}/blob/main/LICENSE" --short-description "Stable PATH shims for winget portable packages" --description "CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe." --moniker clevershim --author Clevotec --copyright "Copyright Clevotec" --release-notes-url "https://github.com/${{ github.repository }}/releases/tag/${tag}"
+          spawn komac new Clevotec.CleverShim --version $env(RELEASE_VERSION) --urls $env(RELEASE_URL) --submit --token $env(WINGET_TOKEN) --publisher Clevotec --publisher-url "https://github.com/$env(REPOSITORY)" --package-name CleverShim --package-url "https://github.com/$env(REPOSITORY)" --package-locale en-US --license MIT --license-url "https://github.com/$env(REPOSITORY)/blob/main/LICENSE" --short-description "Stable PATH shims for winget portable packages" --description "CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe." --moniker clevershim --author Clevotec --copyright "Copyright Clevotec" --release-notes-url "https://github.com/$env(REPOSITORY)/releases/tag/$env(RELEASE_TAG)"
           expect "portable exe"
           send "n\r"
           expect "Silent switch"
@@ -110,6 +111,6 @@ jobs:
           send "\r"
           expect eof
           catch wait result
-          exit [lindex \$result 3]
+          exit [lindex $result 3]
           EOF
           fi
