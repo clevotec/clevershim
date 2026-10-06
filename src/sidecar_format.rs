@@ -131,8 +131,12 @@ fn push(out: &mut String, key: &str, value: &str) {
 }
 
 pub fn paths_equal(left: &Path, right: &Path) -> bool {
-    let left = normalize_for_compare(&resolve_for_compare(left));
-    let right = normalize_for_compare(&resolve_for_compare(right));
+    paths_equal_resolved(&resolve_for_compare(left), &resolve_for_compare(right))
+}
+
+pub(crate) fn paths_equal_resolved(left: &Path, right: &Path) -> bool {
+    let left = normalize_for_compare(left);
+    let right = normalize_for_compare(right);
     if cfg!(windows) {
         left.eq_ignore_ascii_case(&right)
     } else {
@@ -173,14 +177,25 @@ pub fn normalize_for_compare(path: &Path) -> String {
     }
 }
 
-/// Prefer the OS-resolved path so short names and junctions match canonicalized targets.
+/// Prefer the OS-resolved path so Windows short names and junctions match canonicalized targets.
 pub fn resolve_for_compare(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    #[cfg(windows)]
+    {
+        fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
+    }
 }
 
 pub fn path_is_inside(path: &Path, dir: &Path) -> bool {
-    let path = normalize_for_compare(&resolve_for_compare(path));
-    let dir = normalize_for_compare(&resolve_for_compare(dir));
+    path_is_inside_resolved(&resolve_for_compare(path), &resolve_for_compare(dir))
+}
+
+fn path_is_inside_resolved(path: &Path, dir: &Path) -> bool {
+    let path = normalize_for_compare(path);
+    let dir = normalize_for_compare(dir);
     if path == dir {
         return true;
     }
@@ -190,10 +205,24 @@ pub fn path_is_inside(path: &Path, dir: &Path) -> bool {
 
 /// Repair will not point a shim at itself, at another file in its bin, or at clevershim.
 pub fn is_forbidden_target(target: &Path, shim_exe: &Path, bin_dir: &Path, manager: &Path) -> bool {
-    if paths_equal(target, shim_exe) || paths_equal(target, manager) {
+    let target = resolve_for_compare(target);
+    let shim_exe = resolve_for_compare(shim_exe);
+    let bin_dir = resolve_for_compare(bin_dir);
+    let manager = resolve_for_compare(manager);
+    is_forbidden_target_resolved(&target, &shim_exe, &bin_dir, &manager)
+}
+
+/// Compare already-resolved paths without filesystem I/O during candidate selection.
+pub(crate) fn is_forbidden_target_resolved(
+    target: &Path,
+    shim_exe: &Path,
+    bin_dir: &Path,
+    manager: &Path,
+) -> bool {
+    if paths_equal_resolved(target, shim_exe) || paths_equal_resolved(target, manager) {
         return true;
     }
-    if path_is_inside(target, bin_dir) {
+    if path_is_inside_resolved(target, bin_dir) {
         return true;
     }
     match target.file_name().and_then(|name| name.to_str()) {
@@ -284,7 +313,14 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn short_path_aliases_cannot_bypass_bin_exclusion() {
-        let root = crate::testutil::temp_dir("sidecar-short");
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "clevershim-sidecar-short-{}-{nanos}",
+            std::process::id()
+        ));
         let bin = root.join("bin");
         let shim = bin.join("ffmpeg.exe");
         let manager = root.join("clevershim.exe");
@@ -307,6 +343,7 @@ mod tests {
             &short_bin,
             &short_manager
         ));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(windows)]

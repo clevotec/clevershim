@@ -97,6 +97,28 @@ pub fn matching_package_dirs(packages_root: &Path, package_id: &str) -> Vec<Path
 }
 
 pub fn resolve(ctx: &ResolveContext<'_>) -> ResolveHit {
+    // Resolve comparison roots once; judge canonicalizes each candidate before checking them.
+    let shim_exe = sidecar_format::resolve_for_compare(ctx.shim_exe);
+    let bin_dir = sidecar_format::resolve_for_compare(ctx.bin_dir);
+    let manager = sidecar_format::resolve_for_compare(ctx.manager);
+    let other_packages_root = sidecar_format::resolve_for_compare(ctx.other_packages_root);
+    let other_links_root = sidecar_format::resolve_for_compare(ctx.other_links_root);
+    let resolved_ctx = ResolveContext {
+        scope: ctx.scope,
+        package_id: ctx.package_id,
+        command: ctx.command,
+        packages_root: ctx.packages_root,
+        links_root: ctx.links_root,
+        other_packages_root: &other_packages_root,
+        other_links_root: &other_links_root,
+        install_locations: ctx.install_locations,
+        shim_exe: &shim_exe,
+        bin_dir: &bin_dir,
+        manager: &manager,
+        system_root: ctx.system_root,
+        path_prefix: ctx.path_prefix,
+    };
+    let ctx = &resolved_ctx;
     let names = candidate_file_names(ctx.command);
     let mut searched = Vec::new();
     let mut candidates = Vec::new();
@@ -255,7 +277,12 @@ fn judge(ctx: &ResolveContext<'_>, path: &Path) -> Result<ResolvedTarget, String
     if is_other_scope(ctx, &real) {
         return Err("other scope".into());
     }
-    if sidecar_format::is_forbidden_target(&real, ctx.shim_exe, ctx.bin_dir, ctx.manager) {
+    if sidecar_format::is_forbidden_target_resolved(
+        &real,
+        ctx.shim_exe,
+        ctx.bin_dir,
+        ctx.manager,
+    ) {
         return Err("self-target".into());
     }
     Ok(target_from_path(ctx, real))
@@ -269,8 +296,8 @@ fn path_starts_with(path: &Path, root: &Path) -> bool {
     if root.as_os_str().is_empty() {
         return false;
     }
-    let path = sidecar_format::normalize_for_compare(&sidecar_format::resolve_for_compare(path));
-    let root = sidecar_format::normalize_for_compare(&sidecar_format::resolve_for_compare(root));
+    let path = sidecar_format::normalize_for_compare(path);
+    let root = sidecar_format::normalize_for_compare(root);
     path == root || path.starts_with(&format!("{root}{}", std::path::MAIN_SEPARATOR))
 }
 
