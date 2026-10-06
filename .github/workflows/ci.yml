@@ -16,7 +16,7 @@ jobs:
   catalog-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -31,7 +31,7 @@ jobs:
         run: cargo test --locked --workspace -- --test-threads=1
 
       - name: Upload the scanned catalog
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: winget-catalog
           path: |
@@ -42,7 +42,7 @@ jobs:
     needs: catalog-and-test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -51,7 +51,7 @@ jobs:
           prefix-key: clevershim-ci-windows
 
       - name: Download the scanned catalog
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: winget-catalog
           path: catalog

@@ -24,7 +24,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -37,7 +37,7 @@ jobs:
       - name: Scan the public WinGet source index
         run: cargo run --locked --release --features scan --bin clevershim-scan -- --out catalog/packages.yaml --overrides catalog/overrides.yaml
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: winget-catalog
           path: |
@@ -56,7 +56,7 @@ jobs:
             runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -69,7 +69,7 @@ jobs:
           prefix-key: clevershim-release-${{ matrix.target }}
           key: ${{ matrix.target }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: winget-catalog
           path: catalog
@@ -98,13 +98,13 @@ jobs:
             Set-Content "dist/$name.sha256"
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/clevershim-${{ matrix.target }}.exe
             dist/clevershim-${{ inputs.tag || github.ref_name }}-${{ matrix.target }}.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.target }}
           path: dist/*
@@ -113,13 +113,13 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           merge-multiple: true
           path: dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: winget-catalog
           path: catalog
@@ -141,10 +141,24 @@ jobs:
             ls -la dist
             exit 1
           fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/* catalog/packages.yaml catalog/collisions.yaml --clobber
-          else
-            gh release create "$tag" dist/* catalog/packages.yaml catalog/collisions.yaml \
-              --title "$tag" \
-              --notes "Windows builds of clevershim and clevershim-shim. The x64 exe is the winget installer. packages.yaml is the scanned catalog, including command collisions."
-          fi
+
+          publish_once() {
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" dist/* catalog/packages.yaml catalog/collisions.yaml --clobber
+            else
+              gh release create "$tag" dist/* catalog/packages.yaml catalog/collisions.yaml \
+                --title "$tag" \
+                --notes "Windows builds of clevershim and clevershim-shim. The x64 exe is the winget installer. packages.yaml is the scanned catalog, including command collisions."
+            fi
+          }
+
+          attempt=1
+          until publish_once; do
+            if [ "$attempt" -ge 5 ]; then
+              echo "::error::GitHub Release publish failed after $attempt attempts"
+              exit 1
+            fi
+            echo "::warning::Release publish attempt $attempt failed; retrying"
+            attempt=$((attempt + 1))
+            sleep $((attempt * 5))
+          done
