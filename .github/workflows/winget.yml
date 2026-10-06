@@ -16,7 +16,7 @@ permissions:
 jobs:
   submit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Resolve release tag
         id: release
@@ -36,6 +36,7 @@ jobs:
           echo "url=https://github.com/${REPOSITORY}/releases/download/${tag}/clevershim-x86_64-pc-windows-msvc.exe" >> "$GITHUB_OUTPUT"
 
       - name: Require public package URL and WINGET_TOKEN
+        id: gate
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
@@ -43,14 +44,13 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$REPOSITORY_PRIVATE" = "true" ]; then
-            echo "::warning::Repository is private. WinGet cannot download private release assets. Make clevotec/clevershim public, then re-run this workflow."
-            echo "skip=true" >> "$GITHUB_ENV"
+            echo "::warning::Repository is private. WinGet cannot download private release assets."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ -z "${WINGET_TOKEN:-}" ]; then
-            echo "::warning::WINGET_TOKEN is missing. The GitHub Release is already published. Komac was not run."
-            echo "Add a classic PAT with the public_repo scope as the WINGET_TOKEN secret, and a microsoft/winget-pkgs fork on the same account."
-            echo "skip=true" >> "$GITHUB_ENV"
+            echo "::warning::WINGET_TOKEN is missing. Add a clevotec1 classic PAT with public_repo as WINGET_TOKEN."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           code=$(curl -sS -o /tmp/installer.bin -w "%{http_code}" -L "$RELEASE_URL")
@@ -58,20 +58,18 @@ jobs:
             echo "::error::Installer URL returned HTTP $code: $RELEASE_URL"
             exit 1
           fi
-          echo "skip=false" >> "$GITHUB_ENV"
+          echo "sha256=$(sha256sum /tmp/installer.bin | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - name: Install Komac
-        if: env.skip != 'true'
-        run: |
-          set -euo pipefail
-          curl -fsSL -o /tmp/komac.tar.gz -L "https://github.com/russellbanks/Komac/releases/download/v2.16.0/komac-2.16.0-x86_64-unknown-linux-gnu.tar.gz"
-          tar -xzf /tmp/komac.tar.gz -C /tmp
-          sudo mv /tmp/komac /usr/local/bin/komac
-
-      - name: Sync clevotec1/winget-pkgs with upstream via GitHub API
-        if: env.skip != 'true'
+      - name: Open microsoft/winget-pkgs PR as clevotec1
+        if: steps.gate.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          INSTALLER_SHA256: ${{ steps.gate.outputs.sha256 }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           login=$(gh api user --jq .login)
@@ -79,54 +77,154 @@ jobs:
             echo "::error::WINGET_TOKEN must belong to clevotec1 (got: $login)"
             exit 1
           fi
-          # Fast fork sync. Avoids komac sync, which can hang while rewriting a huge winget-pkgs fork.
-          if ! gh api -X POST "repos/clevotec1/winget-pkgs/merge-upstream" -f branch=master; then
-            echo "::warning::merge-upstream failed; attempting a force sync through the fork default branch tip"
-            upstream=$(gh api repos/microsoft/winget-pkgs/git/ref/heads/master --jq .object.sha)
-            gh api -X PATCH "repos/clevotec1/winget-pkgs/git/refs/heads/master" -f sha="$upstream" -F force=true >/dev/null
-          fi
-          gh api repos/clevotec1/winget-pkgs --jq '{full_name,default_branch,pushed_at,parent:.parent.full_name}'
 
-      - name: Submit Clevotec.CleverShim with Komac
-        if: env.skip != 'true'
-        env:
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_URL: ${{ steps.release.outputs.url }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          # Prefer update when the package already exists. For first publish, feed installer
-          # answers over a PTY so komac does not hang waiting on an interactive TTY.
-          if komac list Clevotec.CleverShim --token "$WINGET_TOKEN" >/tmp/komac-list.txt 2>/tmp/komac-list.err; then
-            timeout 15m komac update Clevotec.CleverShim \
-              --version "$RELEASE_VERSION" \
-              --urls "$RELEASE_URL" \
-              --submit \
-              --skip-pr-check \
-              --token "$WINGET_TOKEN"
+          if ! gh api -X POST repos/clevotec1/winget-pkgs/merge-upstream -f branch=master >/tmp/merge.json; then
+            echo "::warning::merge-upstream failed; force-syncing master tip"
+            upstream=$(gh api repos/microsoft/winget-pkgs/git/ref/heads/master --jq .object.sha)
+            gh api -X PATCH repos/clevotec1/winget-pkgs/git/refs/heads/master -f sha="$upstream" -F force=true >/dev/null
+          fi
+          cat /tmp/merge.json 2>/dev/null || true
+
+          branch="clevotec-clevershim-${RELEASE_VERSION}"
+          base_sha=$(gh api repos/clevotec1/winget-pkgs/git/ref/heads/master --jq .object.sha)
+          if gh api "repos/clevotec1/winget-pkgs/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/clevotec1/winget-pkgs/git/refs/heads/${branch}" -f sha="$base_sha" -F force=true >/dev/null
           else
-            answers=$'n\n/install\n/install\n\n\n\nclevershim\n\n\n'
-            # script(1) allocates a PTY; printf supplies the EXE installer questionnaire.
-            timeout 15m script -q -e -c "printf '%s' \"$answers\" | komac new Clevotec.CleverShim \
-              --version \"$RELEASE_VERSION\" \
-              --urls \"$RELEASE_URL\" \
-              --submit \
-              --skip-pr-check \
-              --token \"$WINGET_TOKEN\" \
-              --publisher Clevotec \
-              --publisher-url \"https://github.com/$REPOSITORY\" \
-              --package-name CleverShim \
-              --package-url \"https://github.com/$REPOSITORY\" \
-              --package-locale en-US \
-              --license MIT \
-              --license-url \"https://github.com/$REPOSITORY/blob/main/LICENSE\" \
-              --short-description \"Stable PATH shims for winget portable packages\" \
-              --description \"CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe.\" \
-              --moniker clevershim \
-              --author Clevotec \
-              --copyright \"Copyright Clevotec\" \
-              --release-notes-url \"https://github.com/$REPOSITORY/releases/tag/$RELEASE_TAG\"" /dev/null
+            gh api -X POST repos/clevotec1/winget-pkgs/git/refs -f ref="refs/heads/${branch}" -f sha="$base_sha" >/dev/null
+          fi
+
+          mkdir -p /tmp/manifests
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          version = os.environ["RELEASE_VERSION"]
+          url = os.environ["RELEASE_URL"]
+          sha256 = os.environ["INSTALLER_SHA256"]
+          tag = os.environ["RELEASE_TAG"]
+          repo = os.environ["REPOSITORY"]
+          release_date = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
+          root = Path("/tmp/manifests")
+
+          (root / "Clevotec.CleverShim.yaml").write_text(
+          f"""# Created with clevershim release workflow
+          # yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.10.0.schema.json
+
+          PackageIdentifier: Clevotec.CleverShim
+          PackageVersion: {version}
+          DefaultLocale: en-US
+          ManifestType: version
+          ManifestVersion: 1.10.0
+          """.replace("          ", ""),
+              encoding="utf-8",
+          )
+
+          (root / "Clevotec.CleverShim.installer.yaml").write_text(
+          f"""# Created with clevershim release workflow
+          # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+
+          PackageIdentifier: Clevotec.CleverShim
+          PackageVersion: {version}
+          Platform:
+            - Windows.Desktop
+          MinimumOSVersion: 10.0.17763.0
+          InstallerType: exe
+          Scope: user
+          InstallModes:
+            - interactive
+            - silent
+            - silentWithProgress
+          UpgradeBehavior: install
+          Commands:
+            - clevershim
+          ReleaseDate: {release_date}
+          Installers:
+            - Architecture: x64
+              InstallerUrl: {url}
+              InstallerSha256: {sha256}
+              InstallerSwitches:
+                Silent: /install
+                SilentWithProgress: /install
+          ManifestType: installer
+          ManifestVersion: 1.10.0
+          """.replace("          ", ""),
+              encoding="utf-8",
+          )
+
+          (root / "Clevotec.CleverShim.locale.en-US.yaml").write_text(
+          f"""# Created with clevershim release workflow
+          # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+
+          PackageIdentifier: Clevotec.CleverShim
+          PackageVersion: {version}
+          PackageLocale: en-US
+          Publisher: Clevotec
+          PublisherUrl: https://github.com/{repo}
+          PublisherSupportUrl: https://github.com/{repo}/issues
+          Author: Clevotec
+          PackageName: CleverShim
+          PackageUrl: https://github.com/{repo}
+          License: MIT
+          LicenseUrl: https://github.com/{repo}/blob/main/LICENSE
+          Copyright: Copyright Clevotec
+          ShortDescription: Stable PATH shims for winget portable packages
+          Description: CleverShim puts a stable shim on PATH for winget portable and zip packages, and rewrites that shim when an upgrade moves the real exe.
+          Moniker: clevershim
+          Tags:
+            - path
+            - shim
+            - winget
+            - portable
+          ReleaseNotesUrl: https://github.com/{repo}/releases/tag/{tag}
+          ManifestType: defaultLocale
+          ManifestVersion: 1.10.0
+          """.replace("          ", ""),
+              encoding="utf-8",
+          )
+          PY
+
+          put_file() {
+            local path="$1"
+            local file="$2"
+            local message="$3"
+            local b64
+            b64=$(base64 -w0 "$file")
+            local sha
+            sha=$(gh api "repos/clevotec1/winget-pkgs/contents/${path}?ref=${branch}" --jq .sha 2>/dev/null || true)
+            if [ -n "$sha" ]; then
+              gh api -X PUT "repos/clevotec1/winget-pkgs/contents/${path}" \
+                -f message="$message" \
+                -f content="$b64" \
+                -f branch="$branch" \
+                -f sha="$sha" >/dev/null
+            else
+              gh api -X PUT "repos/clevotec1/winget-pkgs/contents/${path}" \
+                -f message="$message" \
+                -f content="$b64" \
+                -f branch="$branch" >/dev/null
+            fi
+          }
+
+          prefix="manifests/c/Clevotec/CleverShim/${RELEASE_VERSION}"
+          put_file "${prefix}/Clevotec.CleverShim.yaml" /tmp/manifests/Clevotec.CleverShim.yaml "Add Clevotec.CleverShim version ${RELEASE_VERSION}"
+          put_file "${prefix}/Clevotec.CleverShim.installer.yaml" /tmp/manifests/Clevotec.CleverShim.installer.yaml "Add Clevotec.CleverShim installer ${RELEASE_VERSION}"
+          put_file "${prefix}/Clevotec.CleverShim.locale.en-US.yaml" /tmp/manifests/Clevotec.CleverShim.locale.en-US.yaml "Add Clevotec.CleverShim locale ${RELEASE_VERSION}"
+
+          existing=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+author:clevotec1+Clevotec.CleverShim+${RELEASE_VERSION}" --jq '.items[0].html_url // empty' || true)
+          if [ -n "$existing" ]; then
+            echo "Existing PR: $existing"
+          else
+            pr_url=$(gh pr create \
+              --repo microsoft/winget-pkgs \
+              --head "clevotec1:${branch}" \
+              --base master \
+              --title "New package: Clevotec.CleverShim version ${RELEASE_VERSION}" \
+              --body "## Description
+          First WinGet submission for CleverShim.
+
+          - Package: \`Clevotec.CleverShim\`
+          - Version: \`${RELEASE_VERSION}\`
+          - Installer: ${RELEASE_URL}
+          - Silent switch: \`/install\`
+          ")
+            echo "Opened PR: $pr_url"
           fi
