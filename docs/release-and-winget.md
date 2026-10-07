@@ -56,3 +56,5 @@ For CleverShim that usually means:
 2. `Commands: clevershim` while only `bin\` was on PATH and the manager lived in the parent folder (fixed by also installing `clevershim.exe` into `bin\`)
 
 After fixing the installer binary, publish a new tag and update or re-open the `microsoft/winget-pkgs` PR with the new URL and SHA256.
+
+The submit workflow updates manifests in place on the version branch. It must not force-reset that branch to `master` while a PR exists: an empty PR is labeled `Unexpected-File` and closed. Re-runs reopen a closed PR for the same version and close only older open PRs for other versions.

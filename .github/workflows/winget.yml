@@ -89,9 +89,14 @@ jobs:
 
           branch="clevotec-clevershim-${RELEASE_VERSION}"
           base_sha=$(gh api repos/clevotec1/winget-pkgs/git/ref/heads/master --jq .object.sha)
-          if gh api "repos/clevotec1/winget-pkgs/git/ref/heads/${branch}" >/dev/null 2>&1; then
-            gh api -X PATCH "repos/clevotec1/winget-pkgs/git/refs/heads/${branch}" -f sha="$base_sha" -F force=true >/dev/null
-          else
+          existing_pr_json=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+author:clevotec1+Clevotec.CleverShim+${RELEASE_VERSION}" --jq '.items[0] // empty' || true)
+          existing_pr_url=$(printf '%s' "$existing_pr_json" | jq -r '.html_url // empty')
+          existing_pr_number=$(printf '%s' "$existing_pr_json" | jq -r '.number // empty')
+          existing_pr_state=$(printf '%s' "$existing_pr_json" | jq -r '.state // empty')
+
+          # Never force-reset a branch that already backs a PR: resetting to master empties the
+          # PR and GitHub closes it. Create from master only when the branch is missing.
+          if ! gh api "repos/clevotec1/winget-pkgs/git/ref/heads/${branch}" >/dev/null 2>&1; then
             gh api -X POST repos/clevotec1/winget-pkgs/git/refs -f ref="refs/heads/${branch}" -f sha="$base_sha" >/dev/null
           fi
 
@@ -212,10 +217,16 @@ jobs:
           put_file "${prefix}/Clevotec.CleverShim.installer.yaml" /tmp/manifests/Clevotec.CleverShim.installer.yaml "Add Clevotec.CleverShim installer ${RELEASE_VERSION}"
           put_file "${prefix}/Clevotec.CleverShim.locale.en-US.yaml" /tmp/manifests/Clevotec.CleverShim.locale.en-US.yaml "Add Clevotec.CleverShim locale ${RELEASE_VERSION}"
 
-          existing=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+author:clevotec1+Clevotec.CleverShim+${RELEASE_VERSION}" --jq '.items[0].html_url // empty' || true)
-          if [ -n "$existing" ]; then
-            echo "Existing PR: $existing"
-            current_pr="$existing"
+          if [ -n "$existing_pr_number" ]; then
+            current_pr="$existing_pr_url"
+            if [ "$existing_pr_state" = "closed" ]; then
+              gh pr reopen "$existing_pr_number" --repo microsoft/winget-pkgs || true
+              echo "Reopened PR: $existing_pr_url"
+            else
+              echo "Existing PR: $existing_pr_url"
+            fi
+            # Re-assert CLA acceptance for company submissions when the bot asks again.
+            gh pr comment "$existing_pr_number" --repo microsoft/winget-pkgs --body '@microsoft-github-policy-service agree company="Clevotec"' || true
           else
             prior=$(gh api "repos/microsoft/winget-pkgs/contents/manifests/c/Clevotec/CleverShim?ref=master" --jq 'length' 2>/dev/null || echo 0)
             if [ "${prior:-0}" -gt 0 ]; then
@@ -240,14 +251,18 @@ jobs:
           ")
             echo "Opened PR: $pr_url"
             current_pr="$pr_url"
+            gh pr comment "$pr_url" --repo microsoft/winget-pkgs --body '@microsoft-github-policy-service agree company="Clevotec"' || true
           fi
 
-          # Close older open submissions for this package so validation focuses on the latest tag.
+          # Close older open submissions for other versions only.
           older=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+is:open+author:clevotec1+Clevotec.CleverShim" --jq '.items[].number' || true)
           for num in $older; do
+            if [ -n "$existing_pr_number" ] && [ "$num" = "$existing_pr_number" ]; then
+              continue
+            fi
             title=$(gh api "repos/microsoft/winget-pkgs/pulls/${num}" --jq .title)
             case "$title" in
-              *" ${RELEASE_VERSION}"*|*" ${RELEASE_VERSION} "*) continue ;;
+              *"version ${RELEASE_VERSION}"*|*" ${RELEASE_VERSION}") continue ;;
             esac
             gh pr close "$num" --repo microsoft/winget-pkgs --comment "Superseded by ${current_pr:-Clevotec.CleverShim ${RELEASE_VERSION}}." || true
           done
