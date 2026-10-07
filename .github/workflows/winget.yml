@@ -217,6 +217,22 @@ jobs:
           put_file "${prefix}/Clevotec.CleverShim.installer.yaml" /tmp/manifests/Clevotec.CleverShim.installer.yaml "Add Clevotec.CleverShim installer ${RELEASE_VERSION}"
           put_file "${prefix}/Clevotec.CleverShim.locale.en-US.yaml" /tmp/manifests/Clevotec.CleverShim.locale.en-US.yaml "Add Clevotec.CleverShim locale ${RELEASE_VERSION}"
 
+          agree_cla_if_needed() {
+            local pr="$1"
+            local labels
+            labels=$(gh pr view "$pr" --repo microsoft/winget-pkgs --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || true)
+            case ",$labels," in
+              *,Needs-CLA,*)
+                # Only comment when the bot still requires CLA; avoid duplicate agree spam.
+                already=$(gh api "repos/microsoft/winget-pkgs/issues/${pr}/comments?per_page=100" \
+                  --jq '[.[] | select(.user.login=="clevotec1" and (.body | test("microsoft-github-policy-service agree")))] | length' 2>/dev/null || echo 0)
+                if [ "${already:-0}" -eq 0 ]; then
+                  gh pr comment "$pr" --repo microsoft/winget-pkgs --body '@microsoft-github-policy-service agree company="Clevotec"' || true
+                fi
+                ;;
+            esac
+          }
+
           if [ -n "$existing_pr_number" ]; then
             current_pr="$existing_pr_url"
             if [ "$existing_pr_state" = "closed" ]; then
@@ -225,8 +241,7 @@ jobs:
             else
               echo "Existing PR: $existing_pr_url"
             fi
-            # Re-assert CLA acceptance for company submissions when the bot asks again.
-            gh pr comment "$existing_pr_number" --repo microsoft/winget-pkgs --body '@microsoft-github-policy-service agree company="Clevotec"' || true
+            agree_cla_if_needed "$existing_pr_number"
           else
             prior=$(gh api "repos/microsoft/winget-pkgs/contents/manifests/c/Clevotec/CleverShim?ref=master" --jq 'length' 2>/dev/null || echo 0)
             if [ "${prior:-0}" -gt 0 ]; then
@@ -251,10 +266,10 @@ jobs:
           ")
             echo "Opened PR: $pr_url"
             current_pr="$pr_url"
-            gh pr comment "$pr_url" --repo microsoft/winget-pkgs --body '@microsoft-github-policy-service agree company="Clevotec"' || true
+            agree_cla_if_needed "$(basename "$pr_url")"
           fi
 
-          # Close older open submissions for other versions only.
+          # Close older open submissions for other versions only. One short close reason, no extras.
           older=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+is:open+author:clevotec1+Clevotec.CleverShim" --jq '.items[].number' || true)
           for num in $older; do
             if [ -n "$existing_pr_number" ] && [ "$num" = "$existing_pr_number" ]; then
@@ -264,5 +279,5 @@ jobs:
             case "$title" in
               *"version ${RELEASE_VERSION}"*|*" ${RELEASE_VERSION}") continue ;;
             esac
-            gh pr close "$num" --repo microsoft/winget-pkgs --comment "Superseded by ${current_pr:-Clevotec.CleverShim ${RELEASE_VERSION}}." || true
+            gh pr close "$num" --repo microsoft/winget-pkgs --comment "Superseded by ${current_pr}." || true
           done
