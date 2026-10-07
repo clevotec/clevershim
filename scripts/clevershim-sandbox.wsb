@@ -1,0 +1,14 @@
+<Configuration>
+  <VGpu>Enable</VGpu>
+  <Networking>Enable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\Users\chris\gitrepos\clevotec\clevershim\scripts\sandbox-share</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\Shared</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\WDAGUtilityAccount\Desktop\Shared\sandbox-install-test.ps1"</Command>
+  </LogonCommand>
+</Configuration>

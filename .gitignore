@@ -3,3 +3,6 @@
 assets/*.exe
 *.msix
 .DS_Store
+
+# Local Windows Sandbox artifacts
+scripts/sandbox-share/
