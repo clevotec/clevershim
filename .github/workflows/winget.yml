@@ -215,6 +215,7 @@ jobs:
           existing=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+author:clevotec1+Clevotec.CleverShim+${RELEASE_VERSION}" --jq '.items[0].html_url // empty' || true)
           if [ -n "$existing" ]; then
             echo "Existing PR: $existing"
+            current_pr="$existing"
           else
             prior=$(gh api "repos/microsoft/winget-pkgs/contents/manifests/c/Clevotec/CleverShim?ref=master" --jq 'length' 2>/dev/null || echo 0)
             if [ "${prior:-0}" -gt 0 ]; then
@@ -238,4 +239,15 @@ jobs:
           - Silent switch: \`/install\`
           ")
             echo "Opened PR: $pr_url"
+            current_pr="$pr_url"
           fi
+
+          # Close older open submissions for this package so validation focuses on the latest tag.
+          older=$(gh api "search/issues?q=repo:microsoft/winget-pkgs+is:pr+is:open+author:clevotec1+Clevotec.CleverShim" --jq '.items[].number' || true)
+          for num in $older; do
+            title=$(gh api "repos/microsoft/winget-pkgs/pulls/${num}" --jq .title)
+            case "$title" in
+              *" ${RELEASE_VERSION}"*|*" ${RELEASE_VERSION} "*) continue ;;
+            esac
+            gh pr close "$num" --repo microsoft/winget-pkgs --comment "Superseded by ${current_pr:-Clevotec.CleverShim ${RELEASE_VERSION}}." || true
+          done
