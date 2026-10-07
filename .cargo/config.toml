@@ -1,0 +1,8 @@
+# Portable WinGet installers must not depend on VCRUNTIME140.dll.
+# A fresh Windows Sandbox / validation agent may lack the VC++ redistributable;
+# the resulting modal "System Error" dialog is labeled Validation-Unattended-Failed.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

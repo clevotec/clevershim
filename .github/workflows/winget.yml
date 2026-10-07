@@ -139,13 +139,17 @@ jobs:
           InstallerType: exe
           Scope: user
           InstallModes:
-            - interactive
             - silent
             - silentWithProgress
           UpgradeBehavior: install
           Commands:
             - clevershim
           ReleaseDate: {release_date}
+          AppsAndFeaturesEntries:
+            - DisplayName: CleverShim
+              Publisher: Clevotec
+              DisplayVersion: {version}
+              ProductCode: Clevotec.CleverShim
           Installers:
             - Architecture: x64
               InstallerUrl: {url}

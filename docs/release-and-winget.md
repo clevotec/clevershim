@@ -56,11 +56,18 @@ Prefer Windows Sandbox or [SandboxTest.ps1](https://github.com/microsoft/winget-
 
 WinGet labels `Validation-Unattended-Failed` when the installer times out or appears to need user input.
 
-For CleverShim 0.1.0 that matched:
+### Root cause on CleverShim 0.1.1 (PR [#448126](https://github.com/microsoft/winget-pkgs/pull/448126))
 
-1. `/install` ran a full catalog sync during setup. Indexing package folders/Uninstall keys once per sync only cut local install time from ~34s to ~27s on v0.1.1, so timeout remains a risk if the validator has a short unattended window. A stronger fix is to finish PATH/task/uninstall registration quickly and run sync detached or at logon.
-2. `Commands: clevershim` while only `bin\` was on PATH and the manager lived in the parent folder (fixed in 0.1.1 by also installing `clevershim.exe` into `bin\`)
+Instrumented Windows Sandbox (`winget install --manifest` + 30s process watcher) showed:
 
-After fixing the installer binary, publish a new tag and let the `winget` workflow (as `clevotec1`) update or reopen the `microsoft/winget-pkgs` PR.
+1. `clevershim-x86_64-pc-windows-msvc.exe` **did** launch under `%LOCALAPPDATA%\Temp\WinGet\...`
+2. A modal window titled **`clevershim-x86_64-pc-windows-msvc.exe - System Error`** stayed open (csrss / Hard Error dialog)
+3. `winget` waited on that installer process → pipeline/SandboxTest hang for hours
+
+`objdump -p` on the 0.1.1 release asset imports **`VCRUNTIME140.dll`** (dynamic MSVC CRT). Hosts with the VC++ redistributable succeed in ~25s; a clean sandbox/validation agent does not, and the missing-DLL dialog looks like "waiting for user input".
+
+**Fix for 0.1.2:** release builds use static CRT (`-C target-feature=+crt-static` in `.cargo/config.toml` for `*-pc-windows-msvc` targets) so the installer has no `VCRUNTIME140.dll` dependency. Keep `/install` synchronous (same as 0.1.1) so the sandbox rerun has one variable. CI (windows job) and Release both run `dumpbin /dependents` on `clevershim.exe` and `clevershim-shim.exe` and fail on `VCRUNTIME|MSVCP|api-ms-win-crt`, so a later `RUSTFLAGS` override cannot silently restore dynamic CRT linkage. CI also uploads `clevershim-msvc-installer` so SandboxTest can prove the MSVC artifact before cutting a tag.
+
+Also fixed earlier: `Commands: clevershim` while only `bin\` was on PATH (0.1.1 installs `clevershim.exe` into `bin\`). Manifest template for 0.1.2 drops unused `interactive` InstallMode and adds `AppsAndFeaturesEntries` for `Clevotec.CleverShim`.
 
 The submit workflow updates manifests in place on the version branch. It must not force-reset that branch to `master` while a PR exists: an empty PR is labeled `Unexpected-File` and closed. Re-runs reopen a closed PR for the same version and close only older open PRs for other versions.

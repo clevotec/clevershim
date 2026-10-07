@@ -110,7 +110,56 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path assets | Out-Null
           Copy-Item target\release\clevershim-shim.exe assets\clevershim-shim.exe
+          # Host target is x86_64-pc-windows-msvc; .cargo/config.toml +crt-static applies.
           cargo build --locked --release --bin clevershim
+
+      - name: Fail if MSVC CRT is dynamically linked
+        shell: pwsh
+        run: |
+          # Prove .cargo/config.toml (+crt-static) took effect on the MSVC
+          # artifacts. A later RUSTFLAGS env would silently override config
+          # rustflags and reintroduce VCRUNTIME140 / api-ms-win-crt deps.
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere not found at $vswhere" }
+          $patterns = @(
+            '**/Hostx64/x64/dumpbin.exe',
+            '**/Hostarm64/arm64/dumpbin.exe',
+            '**/dumpbin.exe'
+          )
+          $dumpbin = $null
+          foreach ($pattern in $patterns) {
+            $dumpbin = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find $pattern |
+              Select-Object -First 1
+            if ($dumpbin) { break }
+            $dumpbin = & $vswhere -latest -products * -find $pattern | Select-Object -First 1
+            if ($dumpbin) { break }
+          }
+          if (-not $dumpbin) { throw 'dumpbin.exe not found via vswhere' }
+          Write-Host "dumpbin=$dumpbin"
+          $exes = @(
+            (Join-Path 'target\release' 'clevershim.exe'),
+            (Join-Path 'target\release' 'clevershim-shim.exe')
+          )
+          $bad = [regex]'VCRUNTIME|MSVCP|api-ms-win-crt'
+          foreach ($exe in $exes) {
+            if (-not (Test-Path $exe)) { throw "missing $exe" }
+            Write-Host "=== dumpbin /dependents $exe ==="
+            $out = & $dumpbin /dependents $exe 2>&1 | Out-String
+            Write-Host $out
+            $hits = $bad.Matches($out) | ForEach-Object { $_.Value } | Select-Object -Unique
+            if ($hits.Count -gt 0) {
+              throw ("$exe dynamically depends on forbidden CRT DLLs: " + ($hits -join ', '))
+            }
+            Write-Host "ok: no dynamic MSVC/UCRT imports in $exe"
+          }
+
+      - name: Upload MSVC installer for sandbox proving
+        uses: actions/upload-artifact@v7
+        with:
+          name: clevershim-msvc-installer
+          path: |
+            target/release/clevershim.exe
+            target/release/clevershim-shim.exe
 
       - name: Verify WinGet installer metadata
         shell: pwsh
