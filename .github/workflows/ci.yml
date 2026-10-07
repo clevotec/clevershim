@@ -144,8 +144,19 @@ jobs:
           foreach ($exe in $exes) {
             if (-not (Test-Path $exe)) { throw "missing $exe" }
             Write-Host "=== dumpbin /dependents $exe ==="
-            $out = & $dumpbin /dependents $exe 2>&1 | Out-String
+            $lines = & $dumpbin /dependents $exe 2>&1
+            $dumpbinExit = $LASTEXITCODE
+            $out = $lines | Out-String
+            if ($dumpbinExit -ne 0) {
+              throw ("dumpbin failed on $exe (exit=$dumpbinExit):`n$out")
+            }
             Write-Host $out
+            # Positive proof dumpbin actually read the import table. A
+            # wrong-arch/broken dumpbin can exit oddly or emit empty output
+            # with no forbidden CRT names, which would otherwise pass.
+            if ($out -notmatch '(?i)KERNEL32\.dll') {
+              throw ("dumpbin output for $exe did not list KERNEL32.dll; refusing to treat as a clean CRT scan:`n$out")
+            }
             $hits = $bad.Matches($out) | ForEach-Object { $_.Value } | Select-Object -Unique
             if ($hits.Count -gt 0) {
               throw ("$exe dynamically depends on forbidden CRT DLLs: " + ($hits -join ', '))
