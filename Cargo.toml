@@ -1,6 +1,6 @@
 [package]
 name = "clevershim"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Stable PATH shims for winget portable packages"
 license = "MIT"

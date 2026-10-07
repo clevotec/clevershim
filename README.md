@@ -1,8 +1,50 @@
 # CleverShim
 
-CleverShim puts a small console shim on a stable PATH directory for winget portable packages. Winget drops those tools in versioned folders, and the symlink it would add often fails without Developer Mode, so the command disappears after install or moves on upgrade. The shim stays put. When its target is gone, it asks `clevershim` to repair the sidecar once and then starts the new file.
+Stable PATH shims for WinGet portable packages.
+
+WinGet drops portable tools in versioned folders, and the symlink it would add often fails without Developer Mode, so the command disappears after install or moves on upgrade. CleverShim puts a small console shim on a stable PATH directory. When the target is gone, the stub asks `clevershim` to repair the sidecar once and then starts the new file.
 
 The stub is original Rust. It does not copy Chocolatey shimgen.
+
+**Package id:** `Clevotec.CleverShim`
+
+## Quick start
+
+```powershell
+# From a GitHub Release asset
+.\clevershim-x86_64-pc-windows-msvc.exe /install
+
+# After install (new terminal)
+clevershim sync
+clevershim list
+```
+
+Or, once published to the community repository:
+
+```powershell
+winget install Clevotec.CleverShim
+```
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Install and uninstall](docs/install.md) | WinGet / release install, layout, verification |
+| [CLI reference](docs/cli.md) | `setup`, `sync`, `repair`, `list`, hooks, shim flags |
+| [How it works](docs/how-it-works.md) | Stub, sidecar, repair rules, PATH policy, DLLs |
+| [Catalog and overrides](docs/catalog-and-overrides.md) | Scan rules, collisions, priority, user files |
+| [Development](docs/development.md) | Build, test, hooks, source map |
+| [Release and WinGet](docs/release-and-winget.md) | Tags, manifests, submission, validation |
+| [Security policy](SECURITY.md) | Vulnerability reporting |
+
+## Behavior in brief
+
+- Two bins: user (`%LOCALAPPDATA%\Clevotec\CleverShim\bin`) and machine (`%ProgramData%\Clevotec\CleverShim\bin`)
+- PATH entries are appended, never prepended
+- One shim per command per scope; priority picks the provider to launch, not PATH order
+- `.bat` / `.cmd` targets run through `cmd.exe /c`; `.ps1` is not shimmed
+- Logon task runs `clevershim sync` for the installing user (not startup, not a timer)
+- Successful shim launches are silent
 
 ## Build
 
@@ -13,60 +55,24 @@ cargo test
 cargo build --release
 ```
 
-That produces `clevershim` and `clevershim-shim`. On Windows the release files are `clevershim.exe` and `clevershim-shim.exe`.
+That produces `clevershim` and `clevershim-shim` (`clevershim.exe` / `clevershim-shim.exe` on Windows).
 
-Regenerate the embedded catalog from the public WinGet source index (not a clone of winget-pkgs):
+Regenerate the embedded catalog from the public WinGet source index:
 
 ```bash
 cargo run --release --features scan --bin clevershim-scan -- --out catalog/packages.yaml
 ```
 
-`catalog/packages.yaml` is compiled into the manager with `include_str!`. `catalog/collisions.yaml` lists commands that more than one package provides. `catalog/overrides.yaml` sets shim-target priority and force-includes `Gyan.FFmpeg`.
+`catalog/packages.yaml` is compiled into the manager with `include_str!`. See [catalog and overrides](docs/catalog-and-overrides.md).
 
 ## Git commit email guard
-
-Enable the versioned hook in each clone:
 
 ```bash
 git config --local core.hooksPath .githooks
 ```
 
-Contributors should use their own GitHub noreply address. The `pre-commit` hook checks the effective author and committer emails, including environment and `--author` overrides, and rejects addresses outside `@users.noreply.github.com`. Both `username@users.noreply.github.com` and `ID+username@users.noreply.github.com` are accepted.
+Contributors should use their own GitHub noreply address. The `pre-commit` hook rejects emails outside `@users.noreply.github.com`. Hook activation is local, bypassable with `--no-verify`, and not server-side enforcement.
 
-Hook activation is local configuration and does not propagate when pushed or cloned. This guard runs for `git commit`; it is bypassable with `--no-verify` and is not server-side enforcement.
+## License
 
-## Install and commands
-
-`clevershim.exe` is both the CLI and the installer.
-
-- `clevershim setup` or `clevershim /install` copies the exe under `%LOCALAPPDATA%\Clevotec\CleverShim\`, appends `%LOCALAPPDATA%\Clevotec\CleverShim\bin` to the user PATH, syncs that user's packages, registers a logon task that runs `clevershim sync`, and writes an HKCU uninstall key.
-- An elevated install also creates `%ProgramData%\Clevotec\CleverShim\bin`, appends it to the system PATH, syncs machine-scope packages, and writes an HKLM uninstall key. A per-user install does not change the system PATH.
-- `clevershim /uninstall` removes the task, the PATH entry, that scope's shims, and its uninstall key. When run from the installed manager, a hidden cleanup process removes that executable after it exits.
-- `clevershim sync` refreshes shims. `clevershim repair` rewrites one sidecar. `clevershim list` prints them. `clevershim hook install` and `clevershim hook remove` manage the logon task.
-
-The logon task runs without elevation when the installing user logs on. Restricting the trigger to that user also lets a non-admin register it. It does not run at startup and it does not run on a timer. Machine-bin writes take a file lock. Directories are appended to PATH, never prepended, so an earlier dedicated `ffmpeg.exe` still wins while it exists.
-
-Each shim is `bin\<command>.exe` plus `bin\<command>.shim`. A `.bat` or `.cmd` target is started through `cmd.exe /c`. `.ps1` is not shimmed. A successful shim call prints nothing of its own. Repair details go to stderr only when repair fails.
-
-A user file at `%LOCALAPPDATA%\clevershim\packages.yaml` can add packages. Overrides in `%ProgramData%\Clevotec\CleverShim\overrides.yaml` apply to the machine. `%LOCALAPPDATA%\Clevotec\CleverShim\overrides.yaml` applies only to that user.
-
-## Tests
-
-`cargo test` covers catalog parsing, package-directory matching, sidecar rewrite, one repair attempt, refusal to retarget a shim at itself or at `bin` (including Windows extended-length drive/UNC and 8.3 short-path aliases), shim removal when a package is absent, and user overrides staying with that user.
-
-On Windows, `cargo test --release --test windows_shim` builds a fixture exe that needs a sibling DLL, deletes the original target, and checks that the same launch retargets and loads the DLL.
-
-For the complete release-mode suite, including the optional SQLite-backed scanner, run `cargo test --release --locked --all-features --no-fail-fast`, then `cargo build --release --locked --all-features`. Windows builds need the MSVC C++ tools and Windows SDK. Native installer verification should check both standard-user and elevated setup, the registry PATH entries and uninstall keys, the logon task, and installed-binary uninstall; unit tests alone do not exercise those operating-system effects.
-
-## Release
-
-Tag `v*` (or run the Release workflow manually with that tag) to build `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`, zip each with a SHA256 file, attest provenance, and publish a GitHub Release. The x64 exe is the winget installer (`Clevotec.CleverShim`, silent switch `/install`).
-
-The x64 manager embeds Windows version metadata (`FileDescription` contains `installer`) so WinGet treats the asset as an EXE installer. The winget workflow hard-codes `/install` as the silent switch in the generated installer manifest.
-
-After a published release, `.github/workflows/winget.yml` submits the package through the GitHub API as `clevotec1`: it syncs the `clevotec1/winget-pkgs` fork to `microsoft/winget-pkgs`, writes the `Clevotec.CleverShim` version/installer/locale manifests under `manifests/c/Clevotec/CleverShim/<version>/`, and opens a PR to `microsoft/winget-pkgs` when one is not already open for that version. WinGet package submission needs:
-
-1. A public repository and public release assets (WinGet cannot download private installer URLs).
-2. A classic PAT in the repository `WINGET_TOKEN` secret (`public_repo` scope) that belongs to `clevotec1`, plus a `microsoft/winget-pkgs` fork on that account (`clevotec1/winget-pkgs`).
-
-Without those, the GitHub Release still publishes and the winget job exits cleanly after reporting what is missing.
+[MIT](LICENSE)

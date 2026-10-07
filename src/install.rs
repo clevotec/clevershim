@@ -166,12 +166,15 @@ pub fn repair_command(
 fn install_scope(layout: &Layout, scope: Scope, with_task: bool) -> Result<()> {
     let root = layout.root(scope);
     fs::create_dir_all(layout.bin(scope))?;
-    let exe = root.join(if cfg!(windows) {
+    let exe_name = if cfg!(windows) {
         "clevershim.exe"
     } else {
         "clevershim"
-    });
+    };
+    let exe = root.join(exe_name);
     copy_self(&exe)?;
+    // PATH only includes bin/, so put a copy there for `Commands: clevershim` / `where clevershim`.
+    copy_self(&layout.bin(scope).join(exe_name))?;
     if let Some(bytes) = load_stub_bytes() {
         let stub_name = if cfg!(windows) {
             "clevershim-shim.exe"
@@ -227,6 +230,8 @@ fn run_sync(layout: &Layout, scope: Scope, stub: Option<&[u8]>) -> Result<()> {
     let catalog = catalog_for(layout, scope)?;
     let overrides = overrides_for(layout, scope)?;
     let manager = manager_for(layout, scope);
+    let package_dirs = crate::resolve::PackageDirIndex::scan(&layout.packages_root(scope));
+    let uninstall_index = platform::UninstallIndex::scan(scope);
     let notes = sync::sync_scope(&SyncRequest {
         layout,
         scope,
@@ -234,7 +239,8 @@ fn run_sync(layout: &Layout, scope: Scope, stub: Option<&[u8]>) -> Result<()> {
         overrides: &overrides,
         stub,
         manager: &manager,
-        install_locations: &|id| platform::uninstall_locations(scope, id),
+        package_dirs: &package_dirs,
+        install_locations: &|id| uninstall_index.matching(id),
     })
     .map_err(plain)?;
     for note in notes {

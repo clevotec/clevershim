@@ -72,28 +72,46 @@ pub fn directory_matches_package(dir_name: &str, package_id: &str) -> bool {
 }
 
 pub fn matching_package_dirs(packages_root: &Path, package_id: &str) -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-    let entries = match fs::read_dir(packages_root) {
-        Ok(entries) => entries,
-        Err(_) => return dirs,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
+    PackageDirIndex::scan(packages_root).matching(package_id)
+}
+
+/// Snapshot of WinGet package folders so sync can avoid re-reading the directory per package.
+#[derive(Debug, Default, Clone)]
+pub struct PackageDirIndex {
+    entries: Vec<(String, PathBuf)>,
+}
+
+impl PackageDirIndex {
+    pub fn scan(packages_root: &Path) -> Self {
+        let mut entries = Vec::new();
+        let Ok(read) = fs::read_dir(packages_root) else {
+            return Self { entries };
+        };
+        for entry in read.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            entries.push((name, path));
         }
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if directory_matches_package(&name, package_id) {
-            dirs.push(path);
-        }
+        Self { entries }
     }
-    dirs.sort_by(|left, right| {
-        mtime(right)
-            .cmp(&mtime(left))
-            .then_with(|| left.file_name().cmp(&right.file_name()))
-    });
-    dirs
+
+    pub fn matching(&self, package_id: &str) -> Vec<PathBuf> {
+        let mut dirs: Vec<PathBuf> = self
+            .entries
+            .iter()
+            .filter(|(name, _)| directory_matches_package(name, package_id))
+            .map(|(_, path)| path.clone())
+            .collect();
+        dirs.sort_by(|left, right| {
+            mtime(right)
+                .cmp(&mtime(left))
+                .then_with(|| left.file_name().cmp(&right.file_name()))
+        });
+        dirs
+    }
 }
 
 pub fn resolve(ctx: &ResolveContext<'_>) -> ResolveHit {

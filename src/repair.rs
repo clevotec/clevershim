@@ -89,9 +89,8 @@ pub fn repair_shim(request: &RepairRequest<'_>) -> Result<RepairReport, String> 
     let old_exists = old_target.is_file();
     let winget = (request.winget_for)(&sidecar.package_id);
     let locations = (request.install_locations)(scope, &sidecar.package_id);
-    let package_dir_present =
-        !resolve::matching_package_dirs(&request.layout.packages_root(scope), &sidecar.package_id)
-            .is_empty();
+    let package_dirs = resolve::PackageDirIndex::scan(&request.layout.packages_root(scope));
+    let package_dir_present = !package_dirs.matching(&sidecar.package_id).is_empty();
     let sync_request = SyncRequest {
         layout: request.layout,
         scope,
@@ -99,6 +98,7 @@ pub fn repair_shim(request: &RepairRequest<'_>) -> Result<RepairReport, String> 
         overrides: request.overrides,
         stub: None,
         manager: request.manager,
+        package_dirs: &package_dirs,
         install_locations: &|id: &str| (request.install_locations)(scope, id),
     };
     let current_package = request.catalog.get(&sidecar.package_id);

@@ -227,16 +227,37 @@ mod win {
     }
 
     pub fn uninstall_locations(scope: Scope, package_id: &str) -> Vec<PathBuf> {
-        let hive = match scope {
-            Scope::User => HKEY_CURRENT_USER,
-            Scope::Machine => HKEY_LOCAL_MACHINE,
-        };
-        let mut found = Vec::new();
-        collect_locations(hive, package_id, &mut found);
-        found
+        UninstallIndex::scan(scope).matching(package_id)
     }
 
-    fn collect_locations(hive: HKEY, package_id: &str, found: &mut Vec<PathBuf>) {
+    /// Snapshot of Uninstall InstallLocation values so sync can avoid re-enumerating the registry
+    /// once per catalog package.
+    #[derive(Debug, Default, Clone)]
+    pub struct UninstallIndex {
+        entries: Vec<(String, PathBuf)>,
+    }
+
+    impl UninstallIndex {
+        pub fn scan(scope: Scope) -> Self {
+            let hive = match scope {
+                Scope::User => HKEY_CURRENT_USER,
+                Scope::Machine => HKEY_LOCAL_MACHINE,
+            };
+            let mut entries = Vec::new();
+            collect_uninstall_entries(hive, &mut entries);
+            Self { entries }
+        }
+
+        pub fn matching(&self, package_id: &str) -> Vec<PathBuf> {
+            self.entries
+                .iter()
+                .filter(|(name, _)| crate::resolve::directory_matches_package(name, package_id))
+                .map(|(_, path)| path.clone())
+                .collect()
+        }
+    }
+
+    fn collect_uninstall_entries(hive: HKEY, found: &mut Vec<(String, PathBuf)>) {
         let roots = [
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
             r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
@@ -276,13 +297,11 @@ mod win {
                     break;
                 }
                 let key_name = String::from_utf16_lossy(&name[..name_len as usize]);
-                if crate::resolve::directory_matches_package(&key_name, package_id) {
-                    let sub = format!(r"{root_path}\{key_name}");
-                    if let Ok(location) = read_sz(hive, &sub, "InstallLocation") {
-                        let location = location.trim().trim_end_matches('\\');
-                        if !location.is_empty() {
-                            found.push(PathBuf::from(location));
-                        }
+                let sub = format!(r"{root_path}\{key_name}");
+                if let Ok(location) = read_sz(hive, &sub, "InstallLocation") {
+                    let location = location.trim().trim_end_matches('\\');
+                    if !location.is_empty() {
+                        found.push((key_name, PathBuf::from(location)));
                     }
                 }
                 index += 1;
@@ -482,6 +501,21 @@ pub fn write_uninstall_key(
 #[cfg(not(windows))]
 pub fn remove_uninstall_key(_scope: Scope) -> Result<(), String> {
     Err("uninstall keys run on Windows".into())
+}
+
+#[cfg(not(windows))]
+#[derive(Debug, Default, Clone)]
+pub struct UninstallIndex;
+
+#[cfg(not(windows))]
+impl UninstallIndex {
+    pub fn scan(_scope: Scope) -> Self {
+        Self
+    }
+
+    pub fn matching(&self, _package_id: &str) -> Vec<PathBuf> {
+        Vec::new()
+    }
 }
 
 #[cfg(not(windows))]

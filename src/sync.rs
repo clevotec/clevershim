@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::catalog::CatalogFile;
 use crate::layout::{BinLock, Layout, Scope};
 use crate::overrides::Overrides;
-use crate::resolve::{self, ResolveContext, ResolvedTarget};
+use crate::resolve::{self, PackageDirIndex, ResolveContext, ResolvedTarget};
 use crate::sidecar_format::{self, Sidecar};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +68,7 @@ pub struct SyncRequest<'a> {
     pub overrides: &'a Overrides,
     pub stub: Option<&'a [u8]>,
     pub manager: &'a Path,
+    pub package_dirs: &'a PackageDirIndex,
     pub install_locations: &'a dyn Fn(&str) -> Vec<PathBuf>,
 }
 
@@ -171,8 +172,7 @@ fn provider_views(request: &SyncRequest<'_>, command: &str) -> Vec<ProviderView>
 }
 
 pub fn provider_installed(request: &SyncRequest<'_>, package_id: &str) -> bool {
-    !resolve::matching_package_dirs(&request.layout.packages_root(request.scope), package_id)
-        .is_empty()
+    !request.package_dirs.matching(package_id).is_empty()
         || !(request.install_locations)(package_id).is_empty()
 }
 
@@ -191,17 +191,22 @@ pub fn resolve_package(
         .bin(request.scope)
         .join(resolve::shim_file_name(command));
     let locations = (request.install_locations)(package_id);
+    let packages_root = request.layout.packages_root(request.scope);
+    let links_root = request.layout.links_root(request.scope);
+    let other_packages_root = request.layout.packages_root(other);
+    let other_links_root = request.layout.links_root(other);
+    let bin_dir = request.layout.bin(request.scope);
     let ctx = ResolveContext {
         scope: request.scope,
         package_id,
         command,
-        packages_root: &request.layout.packages_root(request.scope),
-        links_root: &request.layout.links_root(request.scope),
-        other_packages_root: &request.layout.packages_root(other),
-        other_links_root: &request.layout.links_root(other),
+        packages_root: &packages_root,
+        links_root: &links_root,
+        other_packages_root: &other_packages_root,
+        other_links_root: &other_links_root,
         install_locations: &locations,
         shim_exe: &shim_exe,
-        bin_dir: &request.layout.bin(request.scope),
+        bin_dir: &bin_dir,
         manager: request.manager,
         system_root: &request.layout.system_root,
         path_prefix,
@@ -355,6 +360,7 @@ mod tests {
         let none = |_id: &str| Vec::new();
         let manager = layout.user_root().join("clevershim.exe");
         touch(&manager);
+        let user_dirs = PackageDirIndex::scan(&layout.user_packages());
         sync_scope(&SyncRequest {
             layout: &layout,
             scope: Scope::User,
@@ -362,11 +368,13 @@ mod tests {
             overrides: &overrides,
             stub: Some(b"stub"),
             manager: &manager,
+            package_dirs: &user_dirs,
             install_locations: &none,
         })
         .unwrap();
         let machine_manager = layout.machine_root().join("clevershim.exe");
         touch(&machine_manager);
+        let machine_dirs = PackageDirIndex::scan(&layout.machine_packages());
         sync_scope(&SyncRequest {
             layout: &layout,
             scope: Scope::Machine,
@@ -374,6 +382,7 @@ mod tests {
             overrides: &overrides,
             stub: Some(b"stub"),
             manager: &machine_manager,
+            package_dirs: &machine_dirs,
             install_locations: &none,
         })
         .unwrap();
@@ -381,6 +390,7 @@ mod tests {
         assert!(layout.machine_bin().join("ffmpeg.shim").is_file());
 
         fs::remove_dir_all(layout.user_packages()).unwrap();
+        let user_dirs = PackageDirIndex::scan(&layout.user_packages());
         let notes = sync_scope(&SyncRequest {
             layout: &layout,
             scope: Scope::User,
@@ -388,6 +398,7 @@ mod tests {
             overrides: &overrides,
             stub: Some(b"stub"),
             manager: &manager,
+            package_dirs: &user_dirs,
             install_locations: &none,
         })
         .unwrap();
@@ -421,6 +432,7 @@ mod tests {
         )
         .unwrap();
         let none = |_id: &str| Vec::new();
+        let package_dirs = PackageDirIndex::scan(&layout.user_packages());
         let notes = sync_scope(&SyncRequest {
             layout: &layout,
             scope: Scope::User,
@@ -428,6 +440,7 @@ mod tests {
             overrides: &overrides,
             stub: Some(b"stub"),
             manager: &manager,
+            package_dirs: &package_dirs,
             install_locations: &none,
         })
         .unwrap();
