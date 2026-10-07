@@ -12,20 +12,26 @@ The x64 exe is the WinGet installer (`Clevotec.CleverShim`). Windows version met
 
 ## WinGet submission workflow
 
-After a published release, `.github/workflows/winget.yml` (also runnable via `workflow_dispatch` with a tag):
+WinGet package submissions and all comments/PR actions on `microsoft/winget-pkgs` use the **`clevotec1` account exclusively**. Do not open, comment on, reopen, or close CleverShim WinGet PRs from any other GitHub account.
+
+After a published release, `.github/workflows/winget.yml` (also runnable via `workflow_dispatch` with a tag) authenticates as `clevotec1` via `WINGET_TOKEN` and:
 
 1. Downloads the public x64 exe and hashes it
 2. Syncs the `clevotec1/winget-pkgs` fork to `microsoft/winget-pkgs`
 3. Writes manifests under `manifests/c/Clevotec/CleverShim/<version>/`
-4. Opens a PR to `microsoft/winget-pkgs` when one is not already open for that version
+4. Opens or updates a PR to `microsoft/winget-pkgs` for that version
+5. Posts CLA agreement only when `Needs-CLA` is present and no prior `clevotec1` agree comment exists
+6. Closes older open CleverShim PRs for other versions
 
 Requirements:
 
 1. Public repository and public release assets
-2. Repository secret `WINGET_TOKEN`: classic PAT for `clevotec1` with `public_repo`
+2. Repository secret `WINGET_TOKEN`: classic PAT for **`clevotec1` only** (`public_repo`)
 3. Fork `clevotec1/winget-pkgs`
 
 Without those, the GitHub Release still publishes and the winget job exits after reporting what is missing.
+
+Local `gh` sessions for other accounts must not be used against CleverShim WinGet PRs. Re-run the `winget` workflow instead.
 
 ## Package identity
 
@@ -50,11 +56,11 @@ Prefer Windows Sandbox or [SandboxTest.ps1](https://github.com/microsoft/winget-
 
 WinGet labels `Validation-Unattended-Failed` when the installer times out or appears to need user input.
 
-For CleverShim that usually means:
+For CleverShim 0.1.0 that matched:
 
-1. `/install` took too long because sync re-scanned package folders / Uninstall registry once per catalog package (fixed by indexing those once per sync)
-2. `Commands: clevershim` while only `bin\` was on PATH and the manager lived in the parent folder (fixed by also installing `clevershim.exe` into `bin\`)
+1. `/install` ran a full catalog sync during setup. Indexing package folders/Uninstall keys once per sync only cut local install time from ~34s to ~27s on v0.1.1, so timeout remains a risk if the validator has a short unattended window. A stronger fix is to finish PATH/task/uninstall registration quickly and run sync detached or at logon.
+2. `Commands: clevershim` while only `bin\` was on PATH and the manager lived in the parent folder (fixed in 0.1.1 by also installing `clevershim.exe` into `bin\`)
 
-After fixing the installer binary, publish a new tag and update or re-open the `microsoft/winget-pkgs` PR with the new URL and SHA256.
+After fixing the installer binary, publish a new tag and let the `winget` workflow (as `clevotec1`) update or reopen the `microsoft/winget-pkgs` PR.
 
 The submit workflow updates manifests in place on the version branch. It must not force-reset that branch to `master` while a PR exists: an empty PR is labeled `Unexpected-File` and closed. Re-runs reopen a closed PR for the same version and close only older open PRs for other versions.
