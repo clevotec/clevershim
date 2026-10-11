@@ -14,7 +14,9 @@ The x64 exe is the WinGet installer (`Clevotec.CleverShim`). Windows version met
 
 WinGet package submissions and all comments/PR actions on `microsoft/winget-pkgs` use the **`clevotec1` account exclusively**. Do not open, comment on, reopen, or close CleverShim WinGet PRs from any other GitHub account.
 
-After a published release, `.github/workflows/winget.yml` (also runnable via `workflow_dispatch` with a tag) authenticates as `clevotec1` via `WINGET_TOKEN` and:
+The Release publish job ends by dispatching `.github/workflows/winget.yml` with the release tag (`gh workflow run winget.yml -f tag=…`). That explicit dispatch is required because a GitHub Release created with `GITHUB_TOKEN` does **not** emit a `release: published` event that starts other workflows. `winget.yml` still accepts `workflow_dispatch` (and keeps a `release: published` trigger for non-`GITHUB_TOKEN` publishes).
+
+Once started, the winget job authenticates as `clevotec1` via `WINGET_TOKEN` and:
 
 1. Downloads the public x64 exe and hashes it
 2. Syncs the `clevotec1/winget-pkgs` fork to `microsoft/winget-pkgs`
