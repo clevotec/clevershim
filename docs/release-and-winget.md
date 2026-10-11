@@ -22,7 +22,7 @@ Once started, the winget job authenticates as `clevotec1` via `WINGET_TOKEN` and
 2. Syncs the `clevotec1/winget-pkgs` fork to `microsoft/winget-pkgs`
 3. Writes manifests under `manifests/c/Clevotec/CleverShim/<version>/`
 4. Opens or updates a PR to `microsoft/winget-pkgs` for that version
-5. Posts CLA agreement only when `Needs-CLA` is present and no prior `clevotec1` agree comment exists
+5. On a newly opened PR, waits up to ~120s for the policy bot's `Needs-CLA` label (or CLA comment), then posts CLA agreement when that label is present and no prior `clevotec1` agree comment exists
 6. Closes older open CleverShim PRs for other versions
 
 Requirements:

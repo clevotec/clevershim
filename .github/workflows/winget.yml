@@ -238,6 +238,34 @@ jobs:
             esac
           }
 
+          # The policy bot adds Needs-CLA ~20s after PR creation. Poll so a
+          # fresh submit does not miss the label and require a manual re-run.
+          wait_for_cla_signal() {
+            local pr="$1"
+            local attempt=1
+            local labels bot_cla
+            while [ "$attempt" -le 12 ]; do
+              labels=$(gh pr view "$pr" --repo microsoft/winget-pkgs --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || true)
+              case ",$labels," in
+                *,Needs-CLA,*)
+                  echo "CLA signal: Needs-CLA on PR #$pr (attempt $attempt)"
+                  return 0
+                  ;;
+              esac
+              bot_cla=$(gh api "repos/microsoft/winget-pkgs/issues/${pr}/comments?per_page=100" \
+                --jq '[.[] | select(.user.login=="microsoft-github-policy-service[bot]" and (.body | test("Contributor License Agreement|Needs-CLA|needsCLA"; "i")))] | length' 2>/dev/null || echo 0)
+              if [ "${bot_cla:-0}" -gt 0 ]; then
+                echo "CLA signal: policy-service CLA comment on PR #$pr (attempt $attempt)"
+                return 0
+              fi
+              echo "Waiting for Needs-CLA on PR #$pr (attempt $attempt/12)..."
+              sleep 10
+              attempt=$((attempt + 1))
+            done
+            echo "::warning::No Needs-CLA signal on PR #$pr after 120s; continuing"
+            return 0
+          }
+
           if [ -n "$existing_pr_number" ]; then
             current_pr="$existing_pr_url"
             if [ "$existing_pr_state" = "closed" ]; then
@@ -249,7 +277,8 @@ jobs:
             agree_cla_if_needed "$existing_pr_number"
           else
             prior=$(gh api "repos/microsoft/winget-pkgs/contents/manifests/c/Clevotec/CleverShim?ref=master" --jq 'length' 2>/dev/null || echo 0)
-            if [ "${prior:-0}" -gt 0 ]; then
+            # prior may be "0" or a JSON error string concatenated with 0; only treat a pure integer >0 as existing package.
+            if [[ "$prior" =~ ^[0-9]+$ ]] && [ "$prior" -gt 0 ]; then
               pr_title="Update Clevotec.CleverShim to version ${RELEASE_VERSION}"
               pr_intro="Update CleverShim in the Windows Package Manager community repository."
             else
@@ -271,7 +300,9 @@ jobs:
           ")
             echo "Opened PR: $pr_url"
             current_pr="$pr_url"
-            agree_cla_if_needed "$(basename "$pr_url")"
+            new_pr_number="$(basename "$pr_url")"
+            wait_for_cla_signal "$new_pr_number"
+            agree_cla_if_needed "$new_pr_number"
           fi
 
           # Close older open submissions for other versions only. One short close reason, no extras.
